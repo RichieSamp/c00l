@@ -1,76 +1,71 @@
 --// Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
+local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
 
---// Container
-local ESPObjects = {}
+--// Global containers
+getgenv().ESPNames = {}
+getgenv().Chams = {}
 
---// Cleanup Old ESP
+--// Cleanup Function
 local function ClearESP(player)
-    if ESPObjects[player] then
-        ESPObjects[player].box:Remove()
-        ESPObjects[player].name:Remove()
-        ESPObjects[player] = nil
+    if ESPNames[player] then
+        pcall(function() ESPNames[player]:Remove() end)
+        ESPNames[player] = nil
+    end
+    if Chams[player] and Chams[player]:IsA("Highlight") then
+        pcall(function() Chams[player]:Destroy() end)
+        Chams[player] = nil
     end
 end
 
---// Create ESP for One Player
+--// Create ESP (username + chams)
 local function CreateESP(player)
     if player == LocalPlayer then return end
-    if ESPObjects[player] then return end
+    if ESPNames[player] then return end
 
     local character = player.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then return end
 
-    local nameLabel = Drawing.new("Text")
-    nameLabel.Text = player.Name
-    nameLabel.Size = 16
-    nameLabel.Center = true
-    nameLabel.Outline = true
-    nameLabel.Color = Color3.fromRGB(255, 255, 255)
-    nameLabel.Visible = false
+    -- Username label
+    local label = Drawing.new("Text")
+    label.Text = player.Name
+    label.Size = 16
+    label.Center = true
+    label.Outline = true
+    label.Color = Color3.fromRGB(255, 255, 255)
+    label.Visible = false
+    ESPNames[player] = label
 
-    local box = Drawing.new("Square")
-    box.Color = Color3.fromRGB(255, 0, 0)
-    box.Thickness = 1.5
-    box.Transparency = 1
-    box.Visible = false
-
-    ESPObjects[player] = {
-        name = nameLabel,
-        box = box
-    }
+    -- Chams
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = character
+    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.FillTransparency = 0.4
+    highlight.OutlineTransparency = 0
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = character
+    Chams[player] = highlight
 end
 
---// Update ESP Positions Per Frame
+--// Update ESP Positions
 RunService.RenderStepped:Connect(function()
-    for player, esp in pairs(ESPObjects) do
-        local character = player.Character
-        local hrp = character and character:FindFirstChild("HumanoidRootPart")
-
-        if character and hrp and hrp:IsDescendantOf(workspace) then
-            local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-            if onScreen then
-                local distance = (Camera.CFrame.Position - hrp.Position).Magnitude
-                local scale = 1 / (distance * 0.04)
-                local width = 80 * scale
-                local height = 120 * scale
-
-                esp.box.Size = Vector2.new(width, height)
-                esp.box.Position = Vector2.new(pos.X - width / 2, pos.Y - height / 2)
-                esp.box.Visible = true
-
-                esp.name.Position = Vector2.new(pos.X, pos.Y - height / 2 - 14)
-                esp.name.Visible = true
+    local cam = workspace.CurrentCamera
+    for player, label in pairs(ESPNames) do
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if char and hrp and hrp:IsDescendantOf(workspace) then
+            local pos, visible = cam:WorldToViewportPoint(hrp.Position + Vector3.new(0, 2.5, 0))
+            if visible then
+                label.Position = Vector2.new(pos.X, pos.Y)
+                label.Visible = true
             else
-                esp.box.Visible = false
-                esp.name.Visible = false
+                label.Visible = false
             end
         else
-            esp.box.Visible = false
-            esp.name.Visible = false
+            label.Visible = false
         end
     end
 end)
@@ -78,27 +73,41 @@ end)
 --// Refresh ESP Every 5 Seconds
 task.spawn(function()
     while true do
-        -- Cleanup invalid entries
-        for player in pairs(ESPObjects) do
-            if not Players:FindFirstChild(player.Name) then
-                ClearESP(player)
-            end
-        end
-
-        -- Rebuild ESP for current valid players
-        for _, player in ipairs(Players:GetPlayers()) do
+        for player in Players:GetPlayers() do
             task.spawn(function()
-                ClearESP(player) -- Force recreate
+                ClearESP(player)
                 task.wait(0.1)
                 CreateESP(player)
             end)
         end
-
         task.wait(5)
     end
 end)
 
---// Auto-cleanup if player leaves
-Players.PlayerRemoving:Connect(function(player)
-    ClearESP(player)
+--// Clean up on leave
+Players.PlayerRemoving:Connect(ClearESP)
+
+--// UNLOAD BUTTON UI (Bottom Left)
+local buttonGui = Instance.new("ScreenGui", game.CoreGui)
+buttonGui.Name = "ESP_Unload_GUI"
+
+local unloadBtn = Instance.new("TextButton", buttonGui)
+unloadBtn.Size = UDim2.new(0, 120, 0, 40)
+unloadBtn.Position = UDim2.new(0, 10, 1, -50)
+unloadBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+unloadBtn.BorderSizePixel = 0
+unloadBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+unloadBtn.Text = "Unload ESP"
+unloadBtn.Font = Enum.Font.GothamBold
+unloadBtn.TextSize = 16
+unloadBtn.AutoButtonColor = true
+
+unloadBtn.MouseButton1Click:Connect(function()
+    for player in Players:GetPlayers() do
+        ClearESP(player)
+    end
+    ESPNames = nil
+    Chams = nil
+    if buttonGui then buttonGui:Destroy() end
+    collectgarbage("collect")
 end)
