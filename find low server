@@ -1,6 +1,4 @@
--- Roblox Low Server Hopper (1 Player Only)
--- Works in Synapse X, KRNL, or any executor with rconsole + HTTP + Teleport
--- Created by Harpy 🦅
+--// Optimized Low Server Finder Script
 
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
@@ -8,57 +6,46 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local PlaceId = game.PlaceId
 
--- Console setup
-rconsoleclear()
-rconsolename("🦅 Harpy Solo Server Finder")
+-- Settings
+local minimumPlayers = 1 -- Avoids empty servers if set above 0
+local maxRetries = 5
+local cursor = ""
 
-rconsoleprint("@@LIGHT_BLUE@@[INFO] Harpy Activated! Searching for 1-player server...\n")
+local function getServerList()
+    local url = ("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100%s"):format(
+        PlaceId, cursor ~= "" and "&cursor=" .. cursor or ""
+    )
+    local success, response = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet(url))
+    end)
+    return success and response or nil
+end
 
-local function findOnePlayerServer()
-    local cursor = ""
-    local targetServerId = nil
+local function findLowServer()
+    for attempt = 1, maxRetries do
+        local data = getServerList()
+        if not data then continue end
 
-    while true do
-        local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100%s", PlaceId, cursor ~= "" and "&cursor=" .. cursor or "")
-        local success, result = pcall(function()
-            return HttpService:JSONDecode(game:HttpGet(url))
-        end)
-
-        if success and result and result.data then
-            for _, server in ipairs(result.data) do
-                if server.playing == 1 and server.id ~= game.JobId then
-                    targetServerId = server.id
-                    rconsoleprint("@@GREEN@@[FOUND] 1-player server found!\n")
-                    rconsoleprint("[INFO] Server ID: " .. targetServerId .. "\n")
-                    return targetServerId
-                end
+        for _, server in ipairs(data.data) do
+            if server.playing >= minimumPlayers and server.playing < server.maxPlayers then
+                return server.id
             end
+        end
 
-            if result.nextPageCursor then
-                cursor = result.nextPageCursor
-            else
-                break
-            end
+        if data.nextPageCursor then
+            cursor = data.nextPageCursor
         else
-            rconsoleprint("@@RED@@[ERROR] Failed to fetch server list.\n")
             break
         end
     end
-
     return nil
 end
 
-local function hopToOnePlayerServer()
-    local serverId = findOnePlayerServer()
-    if serverId then
-        wait(2)
-        rconsoleprint("@@YELLOW@@[INFO] Teleporting to solo server...\n")
-        TeleportService:TeleportToPlaceInstance(PlaceId, serverId, LocalPlayer)
-    else
-        rconsoleprint("@@RED@@[FAIL] No server with exactly 1 player found.\n")
-    end
+local serverId = findLowServer()
+if serverId then
+    TeleportService:TeleportToPlaceInstance(PlaceId, serverId, LocalPlayer)
+else
+    warn("No suitable low-population server found.")
 end
 
--- Start it
-hopToOnePlayerServer()
 
