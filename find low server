@@ -1,17 +1,9 @@
+-- Low Server Finder Script for Roblox
+-- LocalScript - For use in exploit environments or custom UIs that allow HTTP GET
+
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 local PlaceId = game.PlaceId
-
--- Console Info
-rconsoleclear()
-rconsolename("🌐 Harpy Server Hopper")
-
-rconsoleprint("@@LIGHT_BLUE@@")
-rconsoleprint("[INFO] Harpy Server Hopper Active!\n")
-rconsoleprint("[INFO] PlaceId: " .. PlaceId .. "\n")
-rconsoleprint("[INFO] Starting search for low-pop server...\n\n")
 
 local function findLowServer()
     local cursor = ""
@@ -39,27 +31,22 @@ local function findLowServer()
                 break
             end
         else
-            rconsoleprint("@@RED@@[ERROR] Failed to fetch servers from API.\n")
+            warn("Failed to fetch servers.")
             break
         end
     end
 
-    return lowestServerId, lowestPlayerCount
+    return lowestServerId
 end
 
 local function hopToLowServer()
-    local serverId, playerCount = findLowServer()
+    local serverId = findLowServer()
     if serverId then
-        rconsoleprint("@@GREEN@@[SUCCESS] Found low server!\n")
-        rconsoleprint("[INFO] Server ID: " .. serverId .. "\n")
-        rconsoleprint("[INFO] Player Count: " .. tostring(playerCount) .. "\n")
-        wait(2)
-        rconsoleprint("@@YELLOW@@[INFO] Teleporting to low-pop server...\n")
-        TeleportService:TeleportToPlaceInstance(PlaceId, serverId, LocalPlayer)
+        TeleportService:TeleportToPlaceInstance(PlaceId, serverId, game.Players.LocalPlayer)
     else
-        rconsoleprint("@@RED@@[ERROR] No suitable server found.\n")
+        warn("No suitable server found.")
     end
 end
 
--- Trigger the hop
+-- Run the hop
 hopToLowServer()
