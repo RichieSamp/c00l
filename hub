@@ -1,0 +1,85 @@
+--// Load Rayfield UI
+local Rayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source"))()
+
+--// Setup GUI Window
+local Window = Rayfield:CreateWindow({
+    Name = "Universal Script Hub",
+    LoadingTitle = "Initializing...",
+    LoadingSubtitle = "By Ekmeta",
+    ConfigurationSaving = {
+        Enabled = false
+    }
+})
+
+local MainTab = Window:CreateTab("Scripts", 4483362458)
+
+--// Function: Anti-Cheat Bypass (Client-Side)
+local function BypassAntiCheat()
+    -- Hook Kick
+    hookfunction(game.Players.LocalPlayer.Kick, function(...) return nil end)
+
+    -- Hook __namecall
+    local mt = getrawmetatable(game)
+    setreadonly(mt, false)
+
+    local old = mt.__namecall
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if method == "Kick" then
+            return nil
+        end
+        return old(self, ...)
+    end)
+
+    -- Disable all LocalScripts named "AntiCheat" or similar
+    for _, v in pairs(game:GetDescendants()) do
+        if v:IsA("LocalScript") and v.Name:lower():match("anticheat") then
+            v.Disabled = true
+        end
+    end
+end
+
+--// Function: Show Blur and "Loading Script..."
+local function ShowLoadingUI(duration)
+    local blur = Instance.new("BlurEffect", game.Lighting)
+    blur.Size = 24
+
+    local screenGui = Instance.new("ScreenGui", game.CoreGui)
+    screenGui.IgnoreGuiInset = true
+    screenGui.ResetOnSpawn = false
+    screenGui.Name = "LoadingScreen"
+
+    local textLabel = Instance.new("TextLabel", screenGui)
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = "Loading Script..."
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textLabel.TextStrokeTransparency = 0
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextScaled = true
+
+    task.wait(duration)
+
+    blur:Destroy()
+    screenGui:Destroy()
+end
+
+--// Template Script Button
+MainTab:CreateButton({
+    Name = "Run Auto Farm",
+    Callback = function()
+        BypassAntiCheat()
+        ShowLoadingUI(2.5)
+        -- Replace URL below with your real script
+        loadstring(game:HttpGet("https://pastebin.com/raw/XXXXXXXX"))()
+    end
+})
+
+MainTab:CreateButton({
+    Name = "Run ESP Script",
+    Callback = function()
+        BypassAntiCheat()
+        ShowLoadingUI(2.5)
+        loadstring(game:HttpGet("https://pastebin.com/raw/YYYYYYYY"))()
+    end
+})
