@@ -45,7 +45,7 @@ local requestFunction = (syn and syn.request) or (http and http.request) or (htt
 
 -- === Blacklist Configuration ===
 local BlacklistedUsernames = {
-    ["TrollPlayer1"] = true,
+    ["InfxmousLearzy"] = true,
     ["BadUser99"] = true
 }
 
