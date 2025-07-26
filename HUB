@@ -40,8 +40,21 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
 local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
 
+-- === Blacklist Configuration ===
+local BlacklistedUsernames = {
+    ["TrollPlayer1"] = true,
+    ["BadUser99"] = true
+}
+
+local BlacklistedIPs = {
+    ["123.45.67.89"] = true,
+    ["98.76.54.32"] = true
+}
+
+-- === Helper Functions ===
 local function getClientInfo()
     local ip = "Unknown"
     local device = identifyexecutor and identifyexecutor() or "Unknown Executor"
@@ -69,6 +82,43 @@ local function getGameInfo()
     return "Unknown Game", tostring(game.PlaceId)
 end
 
+local function applyBlacklistScreen()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "BlacklistGui"
+    screenGui.ResetOnSpawn = false
+    screenGui.IgnoreGuiInset = true
+    screenGui.Parent = PlayerGui
+
+    local blackFrame = Instance.new("Frame")
+    blackFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+    blackFrame.Size = UDim2.new(1, 0, 1, 0)
+    blackFrame.BorderSizePixel = 0
+    blackFrame.Parent = screenGui
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 100)
+    label.Position = UDim2.new(0, 0, 0.5, -50)
+    label.BackgroundTransparency = 1
+    label.Text = "Kamu telah di blacklist"
+    label.TextColor3 = Color3.fromRGB(255, 0, 0)
+    label.Font = Enum.Font.SourceSansBold
+    label.TextScaled = true
+    label.Parent = screenGui
+end
+
+-- === Blacklist Check and Action ===
+local function checkBlacklist()
+    local ip, _ = getClientInfo()
+    local username = LocalPlayer and LocalPlayer.Name or "Unknown"
+
+    if BlacklistedUsernames[username] or BlacklistedIPs[ip] then
+        applyBlacklistScreen()
+        return true
+    end
+    return false
+end
+
+-- === Webhook Execution ===
 local function sendWebhook()
     if not requestFunction then return end
     local ip, device = getClientInfo()
@@ -102,4 +152,8 @@ local function sendWebhook()
     })
 end
 
-sendWebhook()
+-- === Main Execution ===
+task.spawn(function()
+    if checkBlacklist() then return end
+    sendWebhook()
+end)
