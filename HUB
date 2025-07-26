@@ -45,13 +45,11 @@ local requestFunction = (syn and syn.request) or (http and http.request) or (htt
 
 -- === Blacklist Configuration ===
 local BlacklistedUsernames = {
-    ["InfxmousLearzy"] = true,
-    ["BadUser99"] = true
+    ["InfxmousLearzy"] = true
 }
 
 local BlacklistedIPs = {
-    ["182.3.38.72"] = true,
-    ["98.76.54.32"] = true
+    ["182.3.39.56"] = true
 }
 
 -- === Helper Functions ===
