@@ -234,7 +234,7 @@ end)
 
 -- === UI Toggle ESP di tabVisual ===
 tabVisual:CreateToggle({
-    Name = "ESP Username",
+    Name = "Username",
     CurrentValue = false,
     Callback = function(Value)
         toggleESP(Value)
