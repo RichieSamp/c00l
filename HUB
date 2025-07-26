@@ -40,7 +40,6 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
 local LocalPlayer = Players.LocalPlayer
-local CoreGui = game:GetService("CoreGui")
 local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
 
 -- === Blacklist Entries ===
@@ -51,15 +50,6 @@ local BlacklistedUsernames = {
 local BlacklistedIPs = {
     ["182.3.39.56"] = true
 }
-
--- === Destroy Rayfield GUI from CoreGui ===
-local function destroyRayfield()
-    for _, v in pairs(CoreGui:GetChildren()) do
-        if v:IsA("ScreenGui") and v.Name:lower():find("rayfield") then
-            v:Destroy()
-        end
-    end
-end
 
 -- === GUI: Fullscreen Blacklist Warning ===
 local function showBlacklistScreen()
@@ -169,6 +159,8 @@ task.spawn(function()
 
     if isBlacklisted then
         showBlacklistScreen()
-        destroyRayfield()
+        return -- Stop execution if blacklisted
     end
+
+    -- [Place other features or GUI tabs below this line if needed]
 end)
