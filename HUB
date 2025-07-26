@@ -36,7 +36,7 @@ task.spawn(function()
     end)
 end)
 
--- Kick Hook
+-- Hook Kick
 local function hookKick()
     local mt = getrawmetatable(game)
     setreadonly(mt, false)
@@ -189,7 +189,7 @@ PlayerTab:CreateButton({
 PlayerTab:CreateButton({
     Name = "Teleport to Player",
     Callback = function()
-        local name = selectedPlayer
+        local name = playerDropdown.CurrentOption
         if not name or name == "" then
             Rayfield:Notify({
                 Title = "Teleport Failed",
@@ -199,35 +199,29 @@ PlayerTab:CreateButton({
             return
         end
 
-        local target = nil
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p.Name == name then
-                target = p
-                break
-            end
-        end
-
-        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                hrp.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
-                Rayfield:Notify({
-                    Title = "Teleport Success",
-                    Content = "Teleported to " .. name,
-                    Duration = 2
-                })
-            end
-        else
+        local target = Players:FindFirstChild(name)
+        if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
             Rayfield:Notify({
                 Title = "Teleport Failed",
                 Content = "Target not found or invalid character.",
                 Duration = 3
             })
+            return
         end
+
+        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        hrp.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+        Rayfield:Notify({
+            Title = "Teleport Success",
+            Content = "Teleported to " .. name,
+            Duration = 2
+        })
     end
 })
 
--- ESP System
+-- ESP
 local espEnabled = { Box = false, Name = false }
 local espObjects = {}
 
@@ -254,7 +248,7 @@ local function drawESP()
                 espObjects[#espObjects + 1] = box
 
                 task.spawn(function()
-                    while espEnabled.Box and box do
+                    while espEnabled.Box and box and player and player.Parent == Players do
                         local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
                         box.Visible = onScreen
                         if onScreen then
@@ -278,7 +272,7 @@ local function drawESP()
                 espObjects[#espObjects + 1] = nameTag
 
                 task.spawn(function()
-                    while espEnabled.Name and nameTag do
+                    while espEnabled.Name and nameTag and player and player.Parent == Players do
                         local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 3, 0))
                         nameTag.Visible = onScreen
                         if onScreen then
@@ -292,6 +286,13 @@ local function drawESP()
         end
     end
 end
+
+Players.PlayerRemoving:Connect(function()
+    clearESP()
+    if espEnabled.Box or espEnabled.Name then
+        drawESP()
+    end
+end)
 
 ESPTab:CreateToggle({
     Name = "Box ESP",
@@ -310,4 +311,3 @@ ESPTab:CreateToggle({
         if state or espEnabled.Box then drawESP() else clearESP() end
     end
 })
-
