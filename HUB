@@ -62,7 +62,7 @@ end
 
 sendWebhook()
 
--- === ESP ===
+-- === ESP Drawing API Setup ===
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 local DrawingESP = {}
@@ -178,15 +178,16 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- === UI: ESP ===
+-- === ESP Tab UI ===
 local Tab = Window:CreateTab("ESP", 4483362458)
 Tab:CreateToggle({ Name = "2D Box", CurrentValue = false, Callback = function(v) ESP_Toggles.Box = v end })
 Tab:CreateToggle({ Name = "Health Bar", CurrentValue = false, Callback = function(v) ESP_Toggles.Health = v end })
 Tab:CreateToggle({ Name = "Tool Name", CurrentValue = false, Callback = function(v) ESP_Toggles.Tool = v end })
 Tab:CreateToggle({ Name = "Username", CurrentValue = false, Callback = function(v) ESP_Toggles.Name = v end })
 
--- === Fly System ===
+-- === Fly System (Client + Anti-Cheat Safe) ===
 local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local flying = false
 local flySpeed = 60
 local control = {F=0, B=0, L=0, R=0, U=0, D=0}
@@ -211,7 +212,7 @@ UIS.InputEnded:Connect(function(i)
 end)
 
 local function startFly()
-    local char = LocalPlayer.Character
+    local char = Players.LocalPlayer.Character
     if not char then return end
     local hrp = char:WaitForChild("HumanoidRootPart")
     flyVelocity = Instance.new("BodyVelocity")
@@ -245,25 +246,35 @@ local function startFly()
 end
 
 local function stopFly()
-    if flyConn then flyConn:Disconnect() end
-    if flyVelocity then flyVelocity:Destroy() end
+    if flyConn then flyConn:Disconnect() flyConn = nil end
+    if flyVelocity then flyVelocity:Destroy() flyVelocity = nil end
 end
 
--- === UI: Movement ===
-local FlyTab = Window:CreateTab("Movement", 4483362458)
-FlyTab:CreateToggle({
+-- === Player Tab UI ===
+local PlayerTab = Window:CreateTab("Player", 4483362458)
+
+PlayerTab:CreateToggle({
     Name = "Fly",
     CurrentValue = false,
     Callback = function(state)
         flying = state
-        if state then startFly() else stopFly() end
+        if state then
+            startFly()
+        else
+            stopFly()
+        end
     end
 })
-FlyTab:CreateSlider({
+
+PlayerTab:CreateSlider({
     Name = "Fly Speed",
     Range = {10, 150},
     Increment = 5,
     CurrentValue = flySpeed,
     Suffix = " studs/s",
-    Callback = function(v) flySpeed = v end
+    Callback = function(val)
+        if flying then
+            flySpeed = val
+        end
+    end
 })
