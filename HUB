@@ -2,9 +2,7 @@
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
-local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
 
 -- === Executor Name sebelum UI ===
@@ -132,9 +130,29 @@ task.spawn(function()
     local ip, executor = getClientInfo()
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
 
-    local isBlacklisted = (BlacklistedUsernames[username] or BlacklistedIPs[ip]) and true or false
+    local function isTableEmpty(tbl)
+        for _ in pairs(tbl) do return false end
+        return true
+    end
+
+    local isUsernameBlacklisted = BlacklistedUsernames[username] or false
+    local isIPBlacklisted = BlacklistedIPs[ip] or false
+
+    local isBlacklistEnabled = not isTableEmpty(BlacklistedUsernames) or not isTableEmpty(BlacklistedIPs)
+    local isBlacklisted = false
+
+    if isBlacklistEnabled then
+        if isUsernameBlacklisted or isIPBlacklisted then
+            isBlacklisted = true
+        end
+    end
+
     sendWebhook(ip, executor, isBlacklisted)
-    if isBlacklisted then showBlacklistScreen() return end
+
+    if isBlacklisted then
+        showBlacklistScreen()
+        return
+    end
 
     local tabPlayer = Window:CreateTab("Player", 4483362458)
     local tabVisual = Window:CreateTab("Visual", 4483362458)
@@ -145,143 +163,4 @@ task.spawn(function()
     tabVisual:CreateParagraph({Title = "Visual", Content = "Fitur visual akan ditambahkan..."})
     tabCombat:CreateParagraph({Title = "Combat", Content = "Fitur combat akan ditambahkan..."})
     tabVehicle:CreateParagraph({Title = "Vehicle", Content = "Fitur kendaraan akan ditambahkan..."})
-
-    -- === ESP START ===
-    local ESP = {}
-    ESP.Enabled = false
-    ESP.Config = {
-        Box = true,
-        Name = true,
-        Chams = true,
-        HealthBar = true,
-        ToolIndicator = true,
-        MaxDistance = 1000
-    }
-
-    local espFolder = Instance.new("Folder")
-    espFolder.Name = "CustomESP"
-    espFolder.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-    local function applyChams(char, enable)
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                local highlight = part:FindFirstChild("Cham") or Instance.new("BoxHandleAdornment")
-                highlight.Name = "Cham"
-                highlight.Adornee = part
-                highlight.Size = part.Size
-                highlight.AlwaysOnTop = true
-                highlight.ZIndex = 5
-                highlight.Transparency = 0.7
-                highlight.Color3 = Color3.new(1, 0, 0)
-                highlight.Visible = enable
-                highlight.Parent = part
-            end
-        end
-    end
-
-    local function createEsp(plr)
-        local char = plr.Character
-        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        local root = char.HumanoidRootPart
-
-        local gui = Instance.new("BillboardGui", espFolder)
-        gui.Name = "ESPGui"
-        gui.Adornee = root
-        gui.Size = UDim2.new(0, 200, 0, 100)
-        gui.AlwaysOnTop = true
-
-        local box = Instance.new("Frame", gui)
-        box.Name = "Box"
-        box.AnchorPoint = Vector2.new(0.5, 0.5)
-        box.BackgroundTransparency = 1
-        box.BorderColor3 = Color3.new(1, 1, 1)
-        box.BorderSizePixel = 2
-        box.Size = UDim2.new(0, 100, 0, 150)
-        box.Position = UDim2.new(0.5, 0, 0.5, 0)
-
-        local nameLabel = Instance.new("TextLabel", gui)
-        nameLabel.Name = "Name"
-        nameLabel.AnchorPoint = Vector2.new(0.5, 1)
-        nameLabel.BackgroundTransparency = 1
-        nameLabel.TextColor3 = Color3.new(1, 1, 1)
-        nameLabel.TextStrokeTransparency = 0
-        nameLabel.TextScaled = true
-        nameLabel.Size = UDim2.new(1, 0, 0, 20)
-        nameLabel.Position = UDim2.new(0.5, 0, 0, -75)
-
-        local healthBar = Instance.new("Frame", box)
-        healthBar.Name = "HealthBar"
-        healthBar.AnchorPoint = Vector2.new(0, 0.5)
-        healthBar.BackgroundColor3 = Color3.new(0, 1, 0)
-        healthBar.BorderSizePixel = 0
-        healthBar.Size = UDim2.new(0, 5, 1, -4)
-        healthBar.Position = UDim2.new(0, -6, 0, 2)
-
-        local toolLabel = Instance.new("TextLabel", gui)
-        toolLabel.Name = "Tool"
-        toolLabel.BackgroundTransparency = 1
-        toolLabel.TextColor3 = Color3.new(1, 1, 0)
-        toolLabel.TextScaled = true
-        toolLabel.Size = UDim2.new(0, 100, 0, 20)
-        toolLabel.AnchorPoint = Vector2.new(0.5, 0)
-        toolLabel.Position = UDim2.new(0.5, 0, 1, 5)
-    end
-
-    function ESP:SetEnabled(val)
-        self.Enabled = val
-        if not val then
-            espFolder:ClearAllChildren()
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p.Character then applyChams(p.Character, false) end
-            end
-        end
-    end
-
-    RunService.RenderStepped:Connect(function()
-        espFolder:ClearAllChildren()
-        if not ESP.Enabled then return end
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                local root = plr.Character.HumanoidRootPart
-                local dist = (root.Position - Camera.CFrame.Position).Magnitude
-                if dist <= ESP.Config.MaxDistance then
-                    createEsp(plr)
-                    if ESP.Config.Chams then applyChams(plr.Character, true) else applyChams(plr.Character, false) end
-                    local gui = espFolder:FindFirstChild("ESPGui", true)
-                    if gui then
-                        local box = gui:FindFirstChild("Box")
-                        local name = gui:FindFirstChild("Name")
-                        local health = box:FindFirstChild("HealthBar")
-                        local tool = gui:FindFirstChild("Tool")
-                        name.Visible = ESP.Config.Name
-                        name.Text = plr.Name
-                        box.Visible = ESP.Config.Box
-                        local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-                        if ESP.Config.HealthBar and hum then
-                            local pct = hum.Health / hum.MaxHealth
-                            health.Size = UDim2.new(0, 5, pct, 0)
-                            health.BackgroundColor3 = pct > 0.5 and Color3.new(0,1,0) or (pct > 0.2 and Color3.new(1,1,0) or Color3.new(1,0,0))
-                            health.Visible = true
-                        else
-                            health.Visible = false
-                        end
-                        if ESP.Config.ToolIndicator then
-                            local t = plr.Character:FindFirstChildOfClass("Tool")
-                            tool.Text = t and t.Name or ""
-                            tool.Visible = t ~= nil
-                        else
-                            tool.Visible = false
-                        end
-                    end
-                end
-            end
-        end
-    end)
-
-    tabVisual:CreateToggle({Name = "Enable ESP", CurrentValue = false, Callback = function(val) ESP:SetEnabled(val) end})
-    tabVisual:CreateToggle({Name = "Box", CurrentValue = true, Callback = function(val) ESP.Config.Box = val end})
-    tabVisual:CreateToggle({Name = "Username", CurrentValue = true, Callback = function(val) ESP.Config.Name = val end})
-    tabVisual:CreateToggle({Name = "Chams", CurrentValue = true, Callback = function(val) ESP.Config.Chams = val end})
-    tabVisual:CreateToggle({Name = "Health Bar", CurrentValue = true, Callback = function(val) ESP.Config.HealthBar = val end})
-    tabVisual:CreateToggle({Name = "Tool Below", CurrentValue = true, Callback = function(val) ESP.Config.ToolIndicator = val end})
 end)
