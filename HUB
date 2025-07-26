@@ -17,11 +17,9 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false
 })
 
--- Tabs
 local PlayerTab = Window:CreateTab("Player", 4483362458)
 local ESPTab = Window:CreateTab("ESP", 4483362458)
 
--- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -54,7 +52,7 @@ local function hookKick()
 end
 hookKick()
 
--- Fly + Noclip + Bypass
+-- Fly Setup
 local flying = false
 local direction = Vector3.zero
 local speed = 60
@@ -97,7 +95,7 @@ RunService.RenderStepped:Connect(function(dt)
 end)
 
 PlayerTab:CreateToggle({
-    Name = "Fly (with Bypass + Noclip)",
+    Name = "Fly (Bypass + Noclip)",
     CurrentValue = false,
     Callback = function(state)
         local char = LocalPlayer.Character
@@ -106,14 +104,11 @@ PlayerTab:CreateToggle({
         if not hrp then return end
 
         flying = state
-        local function setCollision(bool)
-            for _, v in ipairs(char:GetDescendants()) do
-                if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
-                    v.CanCollide = bool
-                end
+        for _, v in ipairs(char:GetDescendants()) do
+            if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
+                v.CanCollide = not state
             end
         end
-        setCollision(not state)
 
         if state then
             att0 = Instance.new("Attachment", hrp)
@@ -160,7 +155,7 @@ PlayerTab:CreateSlider({
     Callback = function(val) speed = val end
 })
 
--- Teleport to Player
+-- Teleport System
 local selectedPlayer = nil
 local playerDropdown = nil
 
@@ -194,7 +189,8 @@ PlayerTab:CreateButton({
 PlayerTab:CreateButton({
     Name = "Teleport to Player",
     Callback = function()
-        if not selectedPlayer then
+        local name = selectedPlayer
+        if not name or name == "" then
             Rayfield:Notify({
                 Title = "Teleport Failed",
                 Content = "No player selected.",
@@ -203,28 +199,35 @@ PlayerTab:CreateButton({
             return
         end
 
-        local target = Players:FindFirstChild(selectedPlayer)
+        local target = nil
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Name == name then
+                target = p
+                break
+            end
+        end
+
         if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
                 hrp.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
                 Rayfield:Notify({
                     Title = "Teleport Success",
-                    Content = "Teleported to " .. selectedPlayer,
+                    Content = "Teleported to " .. name,
                     Duration = 2
                 })
             end
         else
             Rayfield:Notify({
                 Title = "Teleport Failed",
-                Content = "Target invalid or not found.",
+                Content = "Target not found or invalid character.",
                 Duration = 3
             })
         end
     end
 })
 
--- ESP
+-- ESP System
 local espEnabled = { Box = false, Name = false }
 local espObjects = {}
 
@@ -253,13 +256,11 @@ local function drawESP()
                 task.spawn(function()
                     while espEnabled.Box and box do
                         local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                        box.Visible = onScreen
                         if onScreen then
                             local size = 12
                             box.Position = Vector2.new(pos.X - size / 2, pos.Y - size)
                             box.Size = Vector2.new(size, size * 2)
-                            box.Visible = true
-                        else
-                            box.Visible = false
                         end
                         task.wait()
                     end
@@ -279,11 +280,9 @@ local function drawESP()
                 task.spawn(function()
                     while espEnabled.Name and nameTag do
                         local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 3, 0))
+                        nameTag.Visible = onScreen
                         if onScreen then
                             nameTag.Position = Vector2.new(pos.X, pos.Y)
-                            nameTag.Visible = true
-                        else
-                            nameTag.Visible = false
                         end
                         task.wait()
                     end
@@ -311,3 +310,4 @@ ESPTab:CreateToggle({
         if state or espEnabled.Box then drawESP() else clearESP() end
     end
 })
+
