@@ -163,4 +163,45 @@ task.spawn(function()
     tabVisual:CreateParagraph({Title = "Visual", Content = "Fitur visual akan ditambahkan..."})
     tabCombat:CreateParagraph({Title = "Combat", Content = "Fitur combat akan ditambahkan..."})
     tabVehicle:CreateParagraph({Title = "Vehicle", Content = "Fitur kendaraan akan ditambahkan..."})
+    
+    -- === ESP Username ===
+local function createESP(player)
+    if player == LocalPlayer then return end
+    local function addESP(character)
+        if character:FindFirstChild("Head") and not character:FindFirstChild("UsernameESP") then
+            local billboard = Instance.new("BillboardGui")
+            billboard.Name = "UsernameESP"
+            billboard.Adornee = character:FindFirstChild("Head")
+            billboard.AlwaysOnTop = true
+            billboard.Size = UDim2.new(0, 100, 0, 30)
+            billboard.StudsOffset = Vector3.new(0, 2, 0)
+            billboard.Parent = character
+
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Text = player.Name
+            textLabel.Font = Enum.Font.SourceSansBold
+            textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            textLabel.BackgroundTransparency = 1
+            textLabel.TextScaled = true
+            textLabel.Size = UDim2.new(1, 0, 1, 0)
+            textLabel.Parent = billboard
+        end
+    end
+
+    player.CharacterAdded:Connect(function(char)
+        char:WaitForChild("Head", 5)
+        addESP(char)
+    end)
+
+    if player.Character then
+        addESP(player.Character)
+    end
+end
+
+for _, plr in ipairs(Players:GetPlayers()) do
+    createESP(plr)
+end
+
+Players.PlayerAdded:Connect(createESP)
+
 end)
