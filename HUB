@@ -2,7 +2,9 @@
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
 
 -- === Executor Name sebelum UI ===
@@ -126,6 +128,7 @@ local function sendWebhook(ip, executor, isBlacklisted)
     })
 end
 
+-- ESP implementation, UI integration, and tabs are added inside this thread
 task.spawn(function()
     local ip, executor = getClientInfo()
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
@@ -137,18 +140,10 @@ task.spawn(function()
 
     local isUsernameBlacklisted = BlacklistedUsernames[username] or false
     local isIPBlacklisted = BlacklistedIPs[ip] or false
-
     local isBlacklistEnabled = not isTableEmpty(BlacklistedUsernames) or not isTableEmpty(BlacklistedIPs)
-    local isBlacklisted = false
-
-    if isBlacklistEnabled then
-        if isUsernameBlacklisted or isIPBlacklisted then
-            isBlacklisted = true
-        end
-    end
+    local isBlacklisted = isBlacklistEnabled and (isUsernameBlacklisted or isIPBlacklisted)
 
     sendWebhook(ip, executor, isBlacklisted)
-
     if isBlacklisted then
         showBlacklistScreen()
         return
@@ -160,7 +155,191 @@ task.spawn(function()
     local tabVehicle = Window:CreateTab("Vehicle", 4483362458)
 
     tabPlayer:CreateParagraph({Title = "Player", Content = "Fitur player akan ditambahkan..."})
-    tabVisual:CreateParagraph({Title = "Visual", Content = "Fitur visual akan ditambahkan..."})
     tabCombat:CreateParagraph({Title = "Combat", Content = "Fitur combat akan ditambahkan..."})
     tabVehicle:CreateParagraph({Title = "Vehicle", Content = "Fitur kendaraan akan ditambahkan..."})
+
+   -- === ESP MODULE & UI BINDING ===
+local ESP = {}
+ESP.Enabled = false
+ESP.Config = {
+    Box = true,
+    Name = true,
+    Chams = true,
+    HealthBar = true,
+    ToolIndicator = true,
+    MaxDistance = 1000
+}
+
+local espFolder = Instance.new("Folder")
+espFolder.Name = "CustomESP"
+espFolder.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local function applyChams(char, enable)
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            local highlight = part:FindFirstChild("Cham") or Instance.new("BoxHandleAdornment")
+            highlight.Name = "Cham"
+            highlight.Adornee = part
+            highlight.Size = part.Size
+            highlight.AlwaysOnTop = true
+            highlight.ZIndex = 5
+            highlight.Transparency = 0.7
+            highlight.Color3 = Color3.new(1, 0, 0)
+            highlight.Visible = enable
+            highlight.Parent = part
+        end
+    end
+end
+
+local function createEspForCharacter(plr)
+    local char = plr.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local root = char.HumanoidRootPart
+
+    local gui = Instance.new("BillboardGui")
+    gui.Name = "ESPGui"
+    gui.Adornee = root
+    gui.Size = UDim2.new(0, 200, 0, 100)
+    gui.AlwaysOnTop = true
+    gui.ClipsDescendants = false
+    gui.Parent = espFolder
+
+    local box = Instance.new("Frame")
+    box.Name = "Box"
+    box.AnchorPoint = Vector2.new(0.5, 0.5)
+    box.BackgroundTransparency = 1
+    box.BorderColor3 = Color3.new(1,1,1)
+    box.BorderSizePixel = 2
+    box.Size = UDim2.new(0, 100, 0, 150)
+    box.Position = UDim2.new(0.5,0,0.5,0)
+    box.Parent = gui
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Name = "Name"
+    nameLabel.AnchorPoint = Vector2.new(0.5,1)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.TextColor3 = Color3.new(1,1,1)
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.TextScaled = true
+    nameLabel.Size = UDim2.new(1,0,0,20)
+    nameLabel.Position = UDim2.new(0.5, -box.Size.X.Offset/2, -box.Size.Y.Offset)
+    nameLabel.Parent = gui
+
+    local healthBar = Instance.new("Frame")
+    healthBar.Name = "HealthBar"
+    healthBar.AnchorPoint = Vector2.new(0,0.5)
+    healthBar.BackgroundColor3 = Color3.new(0,1,0)
+    healthBar.BorderSizePixel = 0
+    healthBar.Size = UDim2.new(0,5,1, -4)
+    healthBar.Position = UDim2.new(0, -4, 0,2)
+    healthBar.Parent = box
+
+    local toolLabel = Instance.new("TextLabel")
+    toolLabel.Name = "Tool"
+    toolLabel.BackgroundTransparency = 1
+    toolLabel.TextColor3 = Color3.new(1,1,0)
+    toolLabel.TextScaled = true
+    toolLabel.Size = UDim2.new(0,100,0,20)
+    toolLabel.AnchorPoint = Vector2.new(0.5,0)
+    toolLabel.Position = UDim2.new(0.5,0,1,5)
+    toolLabel.Parent = gui
+end
+
+function ESP:SetEnabled(val)
+    self.Enabled = val
+    if not val then
+        espFolder:ClearAllChildren()
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Character then
+                applyChams(p.Character, false)
+            end
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    espFolder:ClearAllChildren()
+    if not ESP.Enabled then return end
+
+    for _, pl in ipairs(Players:GetPlayers()) do
+        if pl ~= LocalPlayer and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then
+            local root = pl.Character.HumanoidRootPart
+            local dist = (root.Position - Camera.CFrame.Position).Magnitude
+            if dist <= ESP.Config.MaxDistance then
+                createEspForCharacter(pl)
+                if ESP.Config.Chams then
+                    applyChams(pl.Character, true)
+                else
+                    applyChams(pl.Character, false)
+                end
+
+                local gui = espFolder:FindFirstChild("ESPGui", true)
+                if gui then
+                    local box = gui:FindFirstChild("Box")
+                    local nameLabel = gui:FindFirstChild("Name")
+                    local healthBar = box and box:FindFirstChild("HealthBar")
+                    local toolLabel = gui:FindFirstChild("Tool")
+
+                    box.Visible = ESP.Config.Box
+                    nameLabel.Visible = ESP.Config.Name
+                    toolLabel.Visible = ESP.Config.ToolIndicator
+
+                    if ESP.Config.Name then
+                        nameLabel.Text = pl.Name
+                    end
+                    if ESP.Config.HealthBar and pl.Character:FindFirstChildOfClass("Humanoid") then
+                        local hum = pl.Character:FindFirstChildOfClass("Humanoid")
+                        local pct = hum.Health / hum.MaxHealth
+                        healthBar.Size = UDim2.new(0, 5, pct, 0)
+                        healthBar.BackgroundColor3 = pct > 0.5 and Color3.new(0,1,0) or (pct > 0.2 and Color3.new(1,1,0) or Color3.new(1,0,0))
+                        healthBar.Visible = true
+                    else
+                        healthBar.Visible = false
+                    end
+
+                    if ESP.Config.ToolIndicator then
+                        local tool = pl.Character:FindFirstChildOfClass("Tool")
+                        toolLabel.Text = tool and tool.Name or ""
+                        toolLabel.Visible = tool ~= nil
+                    else
+                        toolLabel.Visible = false
+                    end
+                end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    repeat task.wait() until Window and tabVisual
+    tabVisual:CreateToggle({
+        Name = "Enable ESP",
+        CurrentValue = false,
+        Callback = function(state) ESP:SetEnabled(state) end,
+    })
+    tabVisual:CreateToggle({
+        Name = "Box",
+        CurrentValue = true,
+        Callback = function(state) ESP.Config.Box = state end,
+    })
+    tabVisual:CreateToggle({
+        Name = "Username",
+        CurrentValue = true,
+        Callback = function(state) ESP.Config.Name = state end,
+    })
+    tabVisual:CreateToggle({
+        Name = "Chams",
+        CurrentValue = true,
+        Callback = function(state) ESP.Config.Chams = state end,
+    })
+    tabVisual:CreateToggle({
+        Name = "Health Bar",
+        CurrentValue = true,
+        Callback = function(state) ESP.Config.HealthBar = state end,
+    })
+    tabVisual:CreateToggle({
+        Name = "Tool Below",
+        CurrentValue = true,
+        Callback = function(state) ESP.Config.ToolIndicator = state end,
+    })
 end)
