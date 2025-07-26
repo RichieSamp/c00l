@@ -161,5 +161,193 @@ task.spawn(function()
     tabCombat:CreateParagraph({Title = "Combat", Content = "Fitur combat akan ditambahkan..."})
     tabVehicle:CreateParagraph({Title = "Vehicle", Content = "Fitur kendaraan akan ditambahkan..."})
 
-    loadstring(game:HttpGet('https://pastebin.com/raw/2WpvBLUj'))()(tabVisual)
+    -- ESP SETTINGS
+local espEnabled = {
+    Name = false,
+    Box = false,
+    Health = false,
+    Chams = false,
+    Tool = false,
+    Line = false,
+    Distance = false,
+}
+
+local espObjects = {}
+
+local function removeESP(player)
+    if espObjects[player] then
+        for _, v in pairs(espObjects[player]) do
+            if typeof(v) == "Instance" and v.Destroy then
+                v:Destroy()
+            elseif typeof(v) == "table" and v.Remove then
+                v:Remove()
+            end
+        end
+        espObjects[player] = nil
+    end
+end
+
+local function createESP(player)
+    if player == LocalPlayer or not player.Character then return end
+    local character = player.Character
+    local head = character:FindFirstChild("Head")
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not (head and hrp and humanoid) then return end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ESP_Name"
+    billboard.Adornee = head
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = head
+
+    local nameLabel = Instance.new("TextLabel", billboard)
+    nameLabel.Size = UDim2.new(1, 0, 1, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.TextColor3 = Color3.new(1, 1, 1)
+    nameLabel.Text = player.Name
+    nameLabel.TextStrokeTransparency = 0.5
+    nameLabel.TextScaled = true
+    nameLabel.Font = Enum.Font.SourceSansBold
+
+    local distanceLabel = Instance.new("TextLabel", billboard)
+    distanceLabel.Name = "DistanceLabel"
+    distanceLabel.Size = UDim2.new(1, 0, 1, 0)
+    distanceLabel.Position = UDim2.new(0, 0, 1, 0)
+    distanceLabel.BackgroundTransparency = 1
+    distanceLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
+    distanceLabel.TextStrokeTransparency = 0.5
+    distanceLabel.TextScaled = true
+    distanceLabel.Font = Enum.Font.SourceSansBold
+    distanceLabel.Text = ""
+
+    local toolBillboard = Instance.new("BillboardGui")
+    toolBillboard.Name = "ESP_Tool"
+    toolBillboard.Adornee = hrp
+    toolBillboard.Size = UDim2.new(0, 200, 0, 40)
+    toolBillboard.StudsOffset = Vector3.new(0, -3, 0)
+    toolBillboard.AlwaysOnTop = true
+    toolBillboard.Parent = hrp
+
+    local toolLabel = Instance.new("TextLabel", toolBillboard)
+    toolLabel.Size = UDim2.new(1, 0, 1, 0)
+    toolLabel.BackgroundTransparency = 1
+    toolLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+    toolLabel.TextStrokeTransparency = 0.5
+    toolLabel.TextScaled = true
+    toolLabel.Font = Enum.Font.SourceSansBold
+    toolLabel.Text = ""
+
+    local function applyChams()
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                local box = Instance.new("BoxHandleAdornment")
+                box.Name = "ESP_Chams"
+                box.Adornee = part
+                box.Size = part.Size
+                box.AlwaysOnTop = true
+                box.ZIndex = 5
+                box.Transparency = 0.5
+                box.Color3 = Color3.fromRGB(255, 0, 0)
+                box.Parent = part
+                table.insert(espObjects[player], box)
+            end
+        end
+    end
+
+    espObjects[player] = {billboard, toolBillboard}
+    if espEnabled.Chams then applyChams() end
+
+    local line = Drawing.new("Line")
+    line.Visible = false
+    line.Color = Color3.new(1, 1, 1)
+    line.Thickness = 1
+    line.ZIndex = 2
+    table.insert(espObjects[player], line)
+
+    RunService.RenderStepped:Connect(function()
+        if not character or not character.Parent or not espObjects[player] then return end
+        local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+        local health = humanoid.Health / humanoid.MaxHealth
+        toolLabel.Text = player:FindFirstChildOfClass("Backpack") and player:FindFirstChildOfClass("Backpack"):FindFirstChildOfClass("Tool") and player:FindFirstChildOfClass("Backpack"):FindFirstChildOfClass("Tool").Name or ""
+        if espEnabled.Line and onScreen then
+            line.Visible = true
+            local from = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            local to = Vector2.new(screenPos.X, screenPos.Y)
+            line.From = from
+            line.To = to
+        else
+            line.Visible = false
+        end
+    end)
+end
+
+local function refreshESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            removeESP(player)
+            createESP(player)
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function()
+        task.wait(1)
+        createESP(plr)
+    end)
+end)
+Players.PlayerRemoving:Connect(removeESP)
+
+tabVisual:CreateToggle({ Name = "ESP: Username", CurrentValue = false, Callback = function(v) espEnabled.Name = v refreshESP() end })
+tabVisual:CreateToggle({ Name = "ESP: Box (Chams)", CurrentValue = false, Callback = function(v) espEnabled.Chams = v refreshESP() end })
+tabVisual:CreateToggle({ Name = "ESP: Tool Name", CurrentValue = false, Callback = function(v) espEnabled.Tool = v refreshESP() end })
+tabVisual:CreateToggle({ Name = "ESP: Snipe Line", CurrentValue = false, Callback = function(v) espEnabled.Line = v refreshESP() end })
+tabVisual:CreateToggle({ Name = "ESP: Jarak ke Target", CurrentValue = false, Callback = function(v) espEnabled.Distance = v refreshESP() end })
+
+-- Auto-update Tool Name
+task.spawn(function()
+    while true do
+        task.wait(2)
+        if espEnabled.Tool then
+            for player, objs in pairs(espObjects) do
+                local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    for _, obj in pairs(objs) do
+                        if obj:IsA("BillboardGui") and obj.Name == "ESP_Tool" then
+                            local toolName = ""
+                            local tool = player.Character:FindFirstChildOfClass("Tool") or player.Backpack:FindFirstChildOfClass("Tool")
+                            if tool then toolName = tool.Name end
+                            obj:FindFirstChildOfClass("TextLabel").Text = toolName
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Auto-update Jarak
+task.spawn(function()
+    while true do
+        task.wait(2)
+        if espEnabled.Distance then
+            for player, objs in pairs(espObjects) do
+                if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    local hrp = player.Character.HumanoidRootPart
+                    local dist = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) and (LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude or 0
+                    for _, obj in pairs(objs) do
+                        if obj:IsA("BillboardGui") and obj.Name == "ESP_Name" then
+                            local label = obj:FindFirstChild("DistanceLabel")
+                            if label then
+                                label.Text = string.format("%.1f studs", dist)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
 end)
