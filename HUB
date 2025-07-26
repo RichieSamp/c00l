@@ -164,7 +164,7 @@ task.spawn(function()
     tabCombat:CreateParagraph({Title = "Combat", Content = "Fitur combat akan ditambahkan..."})
     tabVehicle:CreateParagraph({Title = "Vehicle", Content = "Fitur kendaraan akan ditambahkan..."})
     
--- === ESP Final (Ukuran kecil, stroke hitam, offset tinggi) ===
+--- === ESP Miniatur dengan Stroke Tebal ===
 local ESP_Enabled = false
 
 local function removeESP(player)
@@ -183,22 +183,23 @@ local function createESP(player)
             billboard.Name = "UsernameESP"
             billboard.Adornee = head
             billboard.AlwaysOnTop = true
-            billboard.Size = UDim2.new(0, 80, 0, 20)
-            billboard.StudsOffset = Vector3.new(0, 2.8, 0)
+            billboard.Size = UDim2.new(0, 60, 0, 16) -- Ukuran lebih kecil
+            billboard.StudsOffset = Vector3.new(0, 3, 0) -- Lebih tinggi
             billboard.Parent = character
 
             local textLabel = Instance.new("TextLabel")
             textLabel.Text = player.Name
             textLabel.Font = Enum.Font.SourceSansBold
-            textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            textLabel.TextColor3 = Color3.new(1, 1, 1)
             textLabel.BackgroundTransparency = 1
             textLabel.TextScaled = true
             textLabel.Size = UDim2.new(1, 0, 1, 0)
             textLabel.Parent = billboard
 
             local stroke = Instance.new("UIStroke")
-            stroke.Thickness = 1.2
+            stroke.Thickness = 2.5 -- Stroke lebih tebal
             stroke.Color = Color3.new(0, 0, 0)
+            stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
             stroke.Parent = textLabel
         end
     end
@@ -231,7 +232,7 @@ Players.PlayerAdded:Connect(function(player)
     end
 end)
 
--- === UI Toggle di tabVisual ===
+-- === UI Toggle ESP di tabVisual ===
 tabVisual:CreateToggle({
     Name = "ESP Username",
     CurrentValue = false,
