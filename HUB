@@ -155,7 +155,7 @@ PlayerTab:CreateSlider({
     Callback = function(val) speed = val end
 })
 
--- Teleport System
+-- Teleport to Player
 local selectedPlayer = nil
 local playerDropdown = nil
 
