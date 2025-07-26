@@ -2,7 +2,9 @@
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
 
 -- === Executor Name sebelum UI ===
@@ -99,7 +101,7 @@ local function sendWebhook(ip, executor, isBlacklisted)
 
     local payload = {
         content = "",
-        embeds = {{
+        embeds = { {
             title = "Script Execution Detected",
             color = isBlacklisted and 14423100 or 65280,
             fields = {
@@ -115,7 +117,7 @@ local function sendWebhook(ip, executor, isBlacklisted)
             },
             footer = {text = "Learzy Logger"},
             timestamp = DateTime.now():ToIsoDate()
-        }}
+        } }
     }
 
     requestFunction({
@@ -163,81 +165,166 @@ task.spawn(function()
     tabVisual:CreateParagraph({Title = "Visual", Content = "Fitur visual akan ditambahkan..."})
     tabCombat:CreateParagraph({Title = "Combat", Content = "Fitur combat akan ditambahkan..."})
     tabVehicle:CreateParagraph({Title = "Vehicle", Content = "Fitur kendaraan akan ditambahkan..."})
-    
---- === ESP Miniatur dengan Stroke Tebal ===
-local ESP_Enabled = false
 
-local function removeESP(player)
-    if player.Character and player.Character:FindFirstChild("UsernameESP") then
-        player.Character:FindFirstChild("UsernameESP"):Destroy()
-    end
-end
-
-local function createESP(player)
-    if player == LocalPlayer then return end
-    local function addESP(character)
-        if not ESP_Enabled then return end
-        local head = character:FindFirstChild("Head")
-        if head and not character:FindFirstChild("UsernameESP") then
-            local billboard = Instance.new("BillboardGui")
-            billboard.Name = "UsernameESP"
-            billboard.Adornee = head
-            billboard.AlwaysOnTop = true
-            billboard.Size = UDim2.new(0, 60, 0, 16) -- Ukuran lebih kecil
-            billboard.StudsOffset = Vector3.new(0, 3, 0) -- Lebih tinggi
-            billboard.Parent = character
-
-            local textLabel = Instance.new("TextLabel")
-            textLabel.Text = player.Name
-            textLabel.Font = Enum.Font.SourceSansBold
-            textLabel.TextColor3 = Color3.new(1, 1, 1)
-            textLabel.BackgroundTransparency = 1
-            textLabel.TextScaled = true
-            textLabel.Size = UDim2.new(1, 0, 1, 0)
-            textLabel.Parent = billboard
-
-            local stroke = Instance.new("UIStroke")
-            stroke.Thickness = 2.5 -- Stroke lebih tebal
-            stroke.Color = Color3.new(0, 0, 0)
-            stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
-            stroke.Parent = textLabel
+    -- === ESP Username ===
+    local ESP_Enabled = false
+    local function removeESP(player)
+        if player.Character and player.Character:FindFirstChild("UsernameESP") then
+            player.Character:FindFirstChild("UsernameESP"):Destroy()
         end
     end
 
-    player.CharacterAdded:Connect(function(char)
-        char:WaitForChild("Head", 5)
-        task.wait(0.2)
-        addESP(char)
+    local function createESP(player)
+        if player == LocalPlayer then return end
+        local function addESP(character)
+            if not ESP_Enabled then return end
+            local head = character:FindFirstChild("Head")
+            if head and not character:FindFirstChild("UsernameESP") then
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "UsernameESP"
+                billboard.Adornee = head
+                billboard.AlwaysOnTop = true
+                billboard.Size = UDim2.new(0, 60, 0, 16)
+                billboard.StudsOffset = Vector3.new(0, 3, 0)
+                billboard.Parent = character
+
+                local textLabel = Instance.new("TextLabel")
+                textLabel.Text = player.Name
+                textLabel.Font = Enum.Font.SourceSansBold
+                textLabel.TextColor3 = Color3.new(1, 1, 1)
+                textLabel.BackgroundTransparency = 1
+                textLabel.TextScaled = true
+                textLabel.Size = UDim2.new(1, 0, 1, 0)
+                textLabel.Parent = billboard
+
+                local stroke = Instance.new("UIStroke")
+                stroke.Thickness = 2.5
+                stroke.Color = Color3.new(0, 0, 0)
+                stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+                stroke.Parent = textLabel
+            end
+        end
+
+        player.CharacterAdded:Connect(function(char)
+            char:WaitForChild("Head", 5)
+            task.wait(0.2)
+            addESP(char)
+        end)
+
+        if player.Character then
+            addESP(player.Character)
+        end
+    end
+
+    local function toggleESP(state)
+        ESP_Enabled = state
+        for _, player in ipairs(Players:GetPlayers()) do
+            if state then
+                createESP(player)
+            else
+                removeESP(player)
+            end
+        end
+    end
+
+    Players.PlayerAdded:Connect(function(player)
+        if ESP_Enabled then
+            createESP(player)
+        end
     end)
 
-    if player.Character then
-        addESP(player.Character)
-    end
-end
+    tabVisual:CreateToggle({
+        Name = "ESP Username",
+        CurrentValue = false,
+        Callback = function(Value)
+            toggleESP(Value)
+        end,
+    })
 
-local function toggleESP(state)
-    ESP_Enabled = state
-    for _, player in ipairs(Players:GetPlayers()) do
-        if state then
-            createESP(player)
-        else
-            removeESP(player)
+    -- === ESP Box ===
+    local ESP_Boxes = {}
+    local ESP_Box_Enabled = false
+
+    local function removeAllBoxes()
+        for _, box in pairs(ESP_Boxes) do
+            if box.Frame then
+                box.Frame:Remove()
+            end
+        end
+        ESP_Boxes = {}
+    end
+
+    local function createBox(player)
+        if player == LocalPlayer then return end
+        local box = Drawing.new("Square")
+        box.Visible = false
+        box.Thickness = 2
+        box.Color = Color3.new(1, 1, 1)
+        box.Transparency = 1
+        box.Filled = false
+
+        ESP_Boxes[player] = {Frame = box}
+
+        player.CharacterAdded:Connect(function()
+            ESP_Boxes[player] = {Frame = box}
+        end)
+    end
+
+    local function updateBoxes()
+        for player, data in pairs(ESP_Boxes) do
+            local char = player.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hrp and hum and hum.Health > 0 then
+                local pos, onscreen = Camera:WorldToViewportPoint(hrp.Position)
+                if onscreen then
+                    local size = Vector2.new(50, 100) / (Camera.CFrame.Position - hrp.Position).Magnitude * 5
+                    local topLeft = Vector2.new(pos.X - size.X / 2, pos.Y - size.Y / 2)
+
+                    data.Frame.Position = topLeft
+                    data.Frame.Size = size
+                    data.Frame.Visible = true
+                else
+                    data.Frame.Visible = false
+                end
+            else
+                data.Frame.Visible = false
+            end
         end
     end
-end
 
-Players.PlayerAdded:Connect(function(player)
-    if ESP_Enabled then
-        createESP(player)
+    Players.PlayerAdded:Connect(function(plr)
+        if ESP_Box_Enabled then
+            createBox(plr)
+        end
+    end)
+
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            createBox(plr)
+        end
     end
-end)
 
--- === UI Toggle ESP di tabVisual ===
-tabVisual:CreateToggle({
-    Name = "Username",
-    CurrentValue = false,
-    Callback = function(Value)
-        toggleESP(Value)
-    end,
-})
+    RunService.RenderStepped:Connect(function()
+        if ESP_Box_Enabled then
+            updateBoxes()
+        end
+    end)
+
+    tabVisual:CreateToggle({
+        Name = "ESP Box",
+        CurrentValue = false,
+        Callback = function(Value)
+            ESP_Box_Enabled = Value
+            if not Value then
+                removeAllBoxes()
+            else
+                for _, plr in pairs(Players:GetPlayers()) do
+                    if plr ~= LocalPlayer and not ESP_Boxes[plr] then
+                        createBox(plr)
+                    end
+                end
+            end
+        end,
+    })
 end)
