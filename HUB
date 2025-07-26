@@ -13,23 +13,6 @@ local Window = Rayfield:CreateWindow({
       Enabled = true,
       FolderName = nil,
       FileName = "Big Hub"
-   },
-
-   Discord = {
-      Enabled = false,
-      Invite = "noinvitelink",
-      RememberJoins = true
-   },
-
-   KeySystem = false,
-   KeySettings = {
-      Title = "Untitled",
-      Subtitle = "Key System",
-      Note = "No method of obtaining the key is provided",
-      FileName = "Key",
-      SaveKey = true,
-      GrabKeyFromSite = false,
-      Key = {"Hello"}
    }
 })
 
@@ -42,10 +25,15 @@ local runService = game:GetService("RunService")
 local camera = workspace.CurrentCamera
 local localPlayer = players.LocalPlayer
 
--- === ESP Configuration ===
+-- === Settings ===
 local espEnabled = false
+local showBox = true
+local showName = true
+local showHealth = true
+local showTool = true
 local teamCheck = false
 
+-- === Colors ===
 local boxColor = Color3.fromRGB(255, 0, 0)
 local textColor = Color3.fromRGB(255, 255, 255)
 local healthBarColor = Color3.fromRGB(0, 255, 0)
@@ -53,7 +41,7 @@ local toolColor = Color3.fromRGB(0, 170, 255)
 
 local espObjects = {}
 
--- === Utility ===
+-- === Drawing Utility ===
 local function createDrawing(class, props)
     local obj = Drawing.new(class)
     for prop, val in pairs(props) do
@@ -62,25 +50,24 @@ local function createDrawing(class, props)
     return obj
 end
 
+-- === Cleanup Utility ===
 local function cleanupESP()
-    for player, items in pairs(espObjects) do
+    for player, drawings in pairs(espObjects) do
         if not player or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
-            for _, drawing in pairs(items) do
-                if drawing.Remove then
-                    drawing:Remove()
-                end
+            for _, obj in pairs(drawings) do
+                if obj.Remove then obj:Remove() end
             end
             espObjects[player] = nil
         end
     end
 end
 
--- === ESP Loop ===
+-- === ESP Logic ===
 runService.RenderStepped:Connect(function()
     if not espEnabled then
-        for _, items in pairs(espObjects) do
-            for _, drawing in pairs(items) do
-                drawing.Visible = false
+        for _, drawings in pairs(espObjects) do
+            for _, obj in pairs(drawings) do
+                obj.Visible = false
             end
         end
         return
@@ -90,34 +77,36 @@ runService.RenderStepped:Connect(function()
         if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             if teamCheck and player.Team == localPlayer.Team then
                 if espObjects[player] then
-                    for _, drawing in pairs(espObjects[player]) do
-                        drawing.Visible = false
+                    for _, obj in pairs(espObjects[player]) do
+                        obj.Visible = false
                     end
                 end
                 continue
             end
 
-            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-            local head = player.Character:FindFirstChild("Head")
-            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            local char = player.Character
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local head = char:FindFirstChild("Head")
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
             if not hrp or not head or not humanoid then continue end
 
-            local screenPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+            local hrpPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
             if not onScreen then
                 if espObjects[player] then
-                    for _, drawing in pairs(espObjects[player]) do
-                        drawing.Visible = false
+                    for _, obj in pairs(espObjects[player]) do
+                        obj.Visible = false
                     end
                 end
                 continue
             end
 
-            local distance = (camera.CFrame.Position - hrp.Position).Magnitude
-            local scale = 1 / distance * 100
-            local boxWidth = 35 * scale
-            local boxHeight = 55 * scale
-            local boxPos = Vector2.new(screenPos.X - boxWidth / 2, screenPos.Y - boxHeight / 2)
+            -- Dimensions from parts
+            local boxHeight = (hrp.Position.Y - head.Position.Y + 2.5) * 14 -- adjusted
+            local boxWidth = boxHeight / 2
+            local boxX = hrpPos.X - boxWidth / 2
+            local boxY = hrpPos.Y - boxHeight / 2
 
+            -- Create ESP elements if missing
             if not espObjects[player] then
                 espObjects[player] = {
                     Box = createDrawing("Square", {Thickness = 1, Transparency = 1, Color = boxColor, Filled = false}),
@@ -130,55 +119,91 @@ runService.RenderStepped:Connect(function()
             local esp = espObjects[player]
 
             -- Box
-            esp.Box.Position = boxPos
+            esp.Box.Position = Vector2.new(boxX, boxY)
             esp.Box.Size = Vector2.new(boxWidth, boxHeight)
-            esp.Box.Visible = true
+            esp.Box.Visible = showBox
 
-            -- Name above head
+            -- Name
             local headPos = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
             esp.Name.Text = player.Name
             esp.Name.Position = Vector2.new(headPos.X, headPos.Y)
-            esp.Name.Visible = true
+            esp.Name.Visible = showName
 
-            -- Health Bar
-            local hp = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-            local barHeight = boxHeight * hp
-            esp.Health.From = Vector2.new(boxPos.X - 4, boxPos.Y + boxHeight)
-            esp.Health.To = Vector2.new(boxPos.X - 4, boxPos.Y + boxHeight - barHeight)
-            esp.Health.Visible = true
+            -- Health
+            local hpRatio = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+            local barHeight = boxHeight * hpRatio
+            esp.Health.From = Vector2.new(boxX - 4, boxY + boxHeight)
+            esp.Health.To = Vector2.new(boxX - 4, boxY + boxHeight - barHeight)
+            esp.Health.Visible = showHealth
 
             -- Tool ESP
             local toolName = ""
-            for _, item in ipairs(player.Character:GetChildren()) do
+            for _, item in ipairs(char:GetChildren()) do
                 if item:IsA("Tool") then
                     toolName = item.Name
                     break
                 end
             end
-            local toolPos = camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+            local footPos = camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
             esp.Tool.Text = toolName
-            esp.Tool.Position = Vector2.new(toolPos.X, toolPos.Y)
-            esp.Tool.Visible = (toolName ~= "")
+            esp.Tool.Position = Vector2.new(footPos.X, footPos.Y)
+            esp.Tool.Visible = showTool and toolName ~= ""
         end
     end
 
     cleanupESP()
 end)
 
--- === Rayfield Controls ===
+-- === Rayfield Toggles ===
 PlayerTab:CreateToggle({
-    Name = "ESP Enabled",
+    Name = "ESP Master Toggle",
     CurrentValue = false,
-    Flag = "ESP_Toggle",
+    Flag = "ESPMaster",
     Callback = function(state)
         espEnabled = state
     end
 })
 
 PlayerTab:CreateToggle({
+    Name = "ESP Box",
+    CurrentValue = true,
+    Flag = "ESPBox",
+    Callback = function(state)
+        showBox = state
+    end
+})
+
+PlayerTab:CreateToggle({
+    Name = "ESP Username",
+    CurrentValue = true,
+    Flag = "ESPName",
+    Callback = function(state)
+        showName = state
+    end
+})
+
+PlayerTab:CreateToggle({
+    Name = "ESP Health Bar",
+    CurrentValue = true,
+    Flag = "ESPHealth",
+    Callback = function(state)
+        showHealth = state
+    end
+})
+
+PlayerTab:CreateToggle({
+    Name = "ESP Tool Under Feet",
+    CurrentValue = true,
+    Flag = "ESPTool",
+    Callback = function(state)
+        showTool = state
+    end
+})
+
+PlayerTab:CreateToggle({
     Name = "Team Check",
     CurrentValue = false,
-    Flag = "ESP_TeamCheck",
+    Flag = "ESPTeam",
     Callback = function(state)
         teamCheck = state
     end
