@@ -50,7 +50,7 @@ local BlacklistedUsernames = {
 }
 
 local BlacklistedIPs = {
-    ["123.45.67.89"] = true,
+    ["182.3.38.72"] = true,
     ["98.76.54.32"] = true
 }
 
