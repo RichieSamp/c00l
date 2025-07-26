@@ -109,8 +109,7 @@ local function sendWebhook(ip, executor, isBlacklisted)
                 {name = "Executor", value = executor, inline = false},
                 {name = "Game Name", value = gameName, inline = false},
                 {name = "Game ID", value = tostring(gameId), inline = true},
-                {name = "Job ID", value = "Current Job", inline = true},
-                {name = "Job ID (Value)", value = tostring(game.JobId), inline = true},
+                {name = "Job ID", value = tostring(game.JobId), inline = true},
                 {name = "Blacklisted", value = isBlacklisted and "Yes" or "No", inline = true}
             },
             footer = {text = "Learzy Logger"},
