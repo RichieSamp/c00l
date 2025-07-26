@@ -8,203 +8,306 @@ local Window = Rayfield:CreateWindow({
    ShowText = "Rayfield",
    Theme = "Default",
    ToggleUIKeybind = "K",
-
    ConfigurationSaving = {
       Enabled = true,
       FolderName = nil,
       FileName = "Big Hub"
-   }
+   },
+   Discord = { Enabled = false },
+   KeySystem = false
 })
 
--- === Tab ===
+-- Tabs
 local PlayerTab = Window:CreateTab("Player", 4483362458)
+local ESPTab = Window:CreateTab("ESP", 4483362458)
 
--- === Services ===
-local players = game:GetService("Players")
-local runService = game:GetService("RunService")
-local camera = workspace.CurrentCamera
-local localPlayer = players.LocalPlayer
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
--- === Settings ===
-local espEnabled = false
-local showBox = true
-local showName = true
-local showHealth = true
-local showTool = true
-local teamCheck = false
-
--- === Colors ===
-local boxColor = Color3.fromRGB(255, 0, 0)
-local textColor = Color3.fromRGB(255, 255, 255)
-local healthBarColor = Color3.fromRGB(0, 255, 0)
-local toolColor = Color3.fromRGB(0, 170, 255)
-
-local espObjects = {}
-
--- === Drawing Utility ===
-local function createDrawing(class, props)
-    local obj = Drawing.new(class)
-    for prop, val in pairs(props) do
-        obj[prop] = val
-    end
-    return obj
-end
-
--- === Cleanup Utility ===
-local function cleanupESP()
-    for player, drawings in pairs(espObjects) do
-        if not player or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
-            for _, obj in pairs(drawings) do
-                if obj.Remove then obj:Remove() end
-            end
-            espObjects[player] = nil
-        end
-    end
-end
-
--- === ESP Logic ===
-runService.RenderStepped:Connect(function()
-    if not espEnabled then
-        for _, drawings in pairs(espObjects) do
-            for _, obj in pairs(drawings) do
-                obj.Visible = false
-            end
-        end
-        return
-    end
-
-    for _, player in ipairs(players:GetPlayers()) do
-        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            if teamCheck and player.Team == localPlayer.Team then
-                if espObjects[player] then
-                    for _, obj in pairs(espObjects[player]) do
-                        obj.Visible = false
-                    end
-                end
-                continue
-            end
-
-            local char = player.Character
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            local head = char:FindFirstChild("Head")
-            local humanoid = char:FindFirstChildOfClass("Humanoid")
-            if not hrp or not head or not humanoid then continue end
-
-            local hrpPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
-            if not onScreen then
-                if espObjects[player] then
-                    for _, obj in pairs(espObjects[player]) do
-                        obj.Visible = false
-                    end
-                end
-                continue
-            end
-
-            -- Dimensions from parts
-            local boxHeight = (hrp.Position.Y - head.Position.Y + 2.5) * 14 -- adjusted
-            local boxWidth = boxHeight / 2
-            local boxX = hrpPos.X - boxWidth / 2
-            local boxY = hrpPos.Y - boxHeight / 2
-
-            -- Create ESP elements if missing
-            if not espObjects[player] then
-                espObjects[player] = {
-                    Box = createDrawing("Square", {Thickness = 1, Transparency = 1, Color = boxColor, Filled = false}),
-                    Name = createDrawing("Text", {Size = 13, Color = textColor, Center = true, Outline = true, Font = 2}),
-                    Health = createDrawing("Line", {Thickness = 2, Transparency = 1, Color = healthBarColor}),
-                    Tool = createDrawing("Text", {Size = 12, Color = toolColor, Center = true, Outline = true, Font = 2})
-                }
-            end
-
-            local esp = espObjects[player]
-
-            -- Box
-            esp.Box.Position = Vector2.new(boxX, boxY)
-            esp.Box.Size = Vector2.new(boxWidth, boxHeight)
-            esp.Box.Visible = showBox
-
-            -- Name
-            local headPos = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
-            esp.Name.Text = player.Name
-            esp.Name.Position = Vector2.new(headPos.X, headPos.Y)
-            esp.Name.Visible = showName
-
-            -- Health
-            local hpRatio = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-            local barHeight = boxHeight * hpRatio
-            esp.Health.From = Vector2.new(boxX - 4, boxY + boxHeight)
-            esp.Health.To = Vector2.new(boxX - 4, boxY + boxHeight - barHeight)
-            esp.Health.Visible = showHealth
-
-            -- Tool ESP
-            local toolName = ""
-            for _, item in ipairs(char:GetChildren()) do
-                if item:IsA("Tool") then
-                    toolName = item.Name
-                    break
-                end
-            end
-            local footPos = camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
-            esp.Tool.Text = toolName
-            esp.Tool.Position = Vector2.new(footPos.X, footPos.Y)
-            esp.Tool.Visible = showTool and toolName ~= ""
-        end
-    end
-
-    cleanupESP()
+-- Anti-AFK
+task.spawn(function()
+    local vu = game:GetService("VirtualUser")
+    LocalPlayer.Idled:Connect(function()
+        vu:Button2Down(Vector2.new(0, 0), Camera.CFrame)
+        task.wait(1)
+        vu:Button2Up(Vector2.new(0, 0), Camera.CFrame)
+    end)
 end)
 
--- === Rayfield Toggles ===
+-- Kick Hook
+local function hookKick()
+    local mt = getrawmetatable(game)
+    setreadonly(mt, false)
+    local old = mt.__namecall
+    mt.__namecall = newcclosure(function(self, ...)
+        if getnamecallmethod() == "Kick" and self == LocalPlayer then
+            warn("[Hook] Kick prevented")
+            return
+        end
+        return old(self, ...)
+    end)
+    setreadonly(mt, true)
+end
+hookKick()
+
+-- Fly + Noclip + Bypass
+local flying = false
+local direction = Vector3.zero
+local speed = 60
+local alignPos, alignOri, att0, att1, groundPart
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    local k = input.KeyCode
+    local v = Vector3.zero
+    if k == Enum.KeyCode.W then v = Vector3.new(0, 0, -1)
+    elseif k == Enum.KeyCode.S then v = Vector3.new(0, 0, 1)
+    elseif k == Enum.KeyCode.A then v = Vector3.new(-1, 0, 0)
+    elseif k == Enum.KeyCode.D then v = Vector3.new(1, 0, 0)
+    elseif k == Enum.KeyCode.Space then v = Vector3.new(0, 1, 0)
+    elseif k == Enum.KeyCode.LeftControl then v = Vector3.new(0, -1, 0)
+    end
+    direction += v
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    local k = input.KeyCode
+    local v = Vector3.zero
+    if k == Enum.KeyCode.W then v = Vector3.new(0, 0, -1)
+    elseif k == Enum.KeyCode.S then v = Vector3.new(0, 0, 1)
+    elseif k == Enum.KeyCode.A then v = Vector3.new(-1, 0, 0)
+    elseif k == Enum.KeyCode.D then v = Vector3.new(1, 0, 0)
+    elseif k == Enum.KeyCode.Space then v = Vector3.new(0, 1, 0)
+    elseif k == Enum.KeyCode.LeftControl then v = Vector3.new(0, -1, 0)
+    end
+    direction -= v
+end)
+
+RunService.RenderStepped:Connect(function(dt)
+    if flying and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LocalPlayer.Character.HumanoidRootPart
+        att1.Position = hrp.Position + Camera.CFrame:VectorToWorldSpace(direction * speed * dt)
+        alignOri.CFrame = Camera.CFrame
+        groundPart.Position = hrp.Position - Vector3.new(0, 3.1, 0)
+    end
+end)
+
 PlayerTab:CreateToggle({
-    Name = "ESP Master Toggle",
+    Name = "Fly (with Bypass + Noclip)",
     CurrentValue = false,
-    Flag = "ESPMaster",
     Callback = function(state)
-        espEnabled = state
+        local char = LocalPlayer.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        flying = state
+        local function setCollision(bool)
+            for _, v in ipairs(char:GetDescendants()) do
+                if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
+                    v.CanCollide = bool
+                end
+            end
+        end
+        setCollision(not state)
+
+        if state then
+            att0 = Instance.new("Attachment", hrp)
+            att1 = Instance.new("Attachment", workspace.Terrain)
+
+            alignPos = Instance.new("AlignPosition")
+            alignPos.Attachment0 = att0
+            alignPos.Attachment1 = att1
+            alignPos.MaxForce = 25000
+            alignPos.Responsiveness = 100
+            alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment
+            alignPos.RigidityEnabled = false
+            alignPos.Parent = hrp
+
+            alignOri = Instance.new("AlignOrientation")
+            alignOri.Attachment0 = att0
+            alignOri.Attachment1 = att1
+            alignOri.MaxTorque = 25000
+            alignOri.Responsiveness = 100
+            alignOri.PrimaryAxisOnly = false
+            alignOri.Parent = hrp
+
+            groundPart = Instance.new("Part")
+            groundPart.Anchored = true
+            groundPart.Size = Vector3.new(2, 0.1, 2)
+            groundPart.Transparency = 1
+            groundPart.CanCollide = true
+            groundPart.Parent = workspace
+        else
+            if alignPos then alignPos:Destroy() end
+            if alignOri then alignOri:Destroy() end
+            if att0 then att0:Destroy() end
+            if att1 then att1:Destroy() end
+            if groundPart then groundPart:Destroy() end
+        end
     end
 })
 
-PlayerTab:CreateToggle({
-    Name = "ESP Box",
-    CurrentValue = true,
-    Flag = "ESPBox",
-    Callback = function(state)
-        showBox = state
+PlayerTab:CreateSlider({
+    Name = "Fly Speed",
+    Range = {10, 150},
+    Increment = 5,
+    CurrentValue = speed,
+    Callback = function(val) speed = val end
+})
+
+-- Teleport to Player
+local selectedPlayer = nil
+local playerDropdown = nil
+
+local function getPlayerList()
+    local list = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            table.insert(list, player.Name)
+        end
+    end
+    return list
+end
+
+playerDropdown = PlayerTab:CreateDropdown({
+    Name = "Select Player",
+    Options = getPlayerList(),
+    CurrentOption = nil,
+    Callback = function(option)
+        selectedPlayer = option
     end
 })
 
-PlayerTab:CreateToggle({
-    Name = "ESP Username",
-    CurrentValue = true,
-    Flag = "ESPName",
-    Callback = function(state)
-        showName = state
+PlayerTab:CreateButton({
+    Name = "Refresh Player List",
+    Callback = function()
+        playerDropdown:Set(getPlayerList())
+        selectedPlayer = nil
     end
 })
 
-PlayerTab:CreateToggle({
-    Name = "ESP Health Bar",
-    CurrentValue = true,
-    Flag = "ESPHealth",
-    Callback = function(state)
-        showHealth = state
+PlayerTab:CreateButton({
+    Name = "Teleport to Player",
+    Callback = function()
+        if not selectedPlayer then
+            Rayfield:Notify({
+                Title = "Teleport Failed",
+                Content = "No player selected.",
+                Duration = 3
+            })
+            return
+        end
+
+        local target = Players:FindFirstChild(selectedPlayer)
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+                Rayfield:Notify({
+                    Title = "Teleport Success",
+                    Content = "Teleported to " .. selectedPlayer,
+                    Duration = 2
+                })
+            end
+        else
+            Rayfield:Notify({
+                Title = "Teleport Failed",
+                Content = "Target invalid or not found.",
+                Duration = 3
+            })
+        end
     end
 })
 
-PlayerTab:CreateToggle({
-    Name = "ESP Tool Under Feet",
-    CurrentValue = true,
-    Flag = "ESPTool",
-    Callback = function(state)
-        showTool = state
-    end
-})
+-- ESP
+local espEnabled = { Box = false, Name = false }
+local espObjects = {}
 
-PlayerTab:CreateToggle({
-    Name = "Team Check",
+local function clearESP()
+    for _, obj in pairs(espObjects) do
+        if obj and obj.Remove then obj:Remove() end
+    end
+    espObjects = {}
+end
+
+local function drawESP()
+    clearESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = player.Character.HumanoidRootPart
+
+            if espEnabled.Box then
+                local box = Drawing.new("Square")
+                box.Visible = true
+                box.Color = Color3.fromRGB(0, 255, 0)
+                box.Thickness = 1.5
+                box.Transparency = 1
+                box.Filled = false
+                espObjects[#espObjects + 1] = box
+
+                task.spawn(function()
+                    while espEnabled.Box and box do
+                        local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                        if onScreen then
+                            local size = 12
+                            box.Position = Vector2.new(pos.X - size / 2, pos.Y - size)
+                            box.Size = Vector2.new(size, size * 2)
+                            box.Visible = true
+                        else
+                            box.Visible = false
+                        end
+                        task.wait()
+                    end
+                    box:Remove()
+                end)
+            end
+
+            if espEnabled.Name then
+                local nameTag = Drawing.new("Text")
+                nameTag.Visible = true
+                nameTag.Center = true
+                nameTag.Color = Color3.fromRGB(255, 255, 255)
+                nameTag.Text = player.Name
+                nameTag.Size = 16
+                espObjects[#espObjects + 1] = nameTag
+
+                task.spawn(function()
+                    while espEnabled.Name and nameTag do
+                        local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 3, 0))
+                        if onScreen then
+                            nameTag.Position = Vector2.new(pos.X, pos.Y)
+                            nameTag.Visible = true
+                        else
+                            nameTag.Visible = false
+                        end
+                        task.wait()
+                    end
+                    nameTag:Remove()
+                end)
+            end
+        end
+    end
+end
+
+ESPTab:CreateToggle({
+    Name = "Box ESP",
     CurrentValue = false,
-    Flag = "ESPTeam",
     Callback = function(state)
-        teamCheck = state
+        espEnabled.Box = state
+        if state or espEnabled.Name then drawESP() else clearESP() end
+    end
+})
+
+ESPTab:CreateToggle({
+    Name = "Name ESP",
+    CurrentValue = false,
+    Callback = function(state)
+        espEnabled.Name = state
+        if state or espEnabled.Box then drawESP() else clearESP() end
     end
 })
