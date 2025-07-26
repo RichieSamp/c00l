@@ -164,14 +164,25 @@ task.spawn(function()
     tabCombat:CreateParagraph({Title = "Combat", Content = "Fitur combat akan ditambahkan..."})
     tabVehicle:CreateParagraph({Title = "Vehicle", Content = "Fitur kendaraan akan ditambahkan..."})
     
-    -- === ESP Username ===
+-- === ESP Toggle Setup ===
+local ESP_Enabled = false
+local ESP_Objects = {}
+
+local function removeESP(player)
+    if player.Character and player.Character:FindFirstChild("UsernameESP") then
+        player.Character:FindFirstChild("UsernameESP"):Destroy()
+    end
+end
+
 local function createESP(player)
     if player == LocalPlayer then return end
     local function addESP(character)
-        if character:FindFirstChild("Head") and not character:FindFirstChild("UsernameESP") then
+        if not ESP_Enabled then return end
+        local head = character:FindFirstChild("Head")
+        if head and not character:FindFirstChild("UsernameESP") then
             local billboard = Instance.new("BillboardGui")
             billboard.Name = "UsernameESP"
-            billboard.Adornee = character:FindFirstChild("Head")
+            billboard.Adornee = head
             billboard.AlwaysOnTop = true
             billboard.Size = UDim2.new(0, 100, 0, 30)
             billboard.StudsOffset = Vector3.new(0, 2, 0)
@@ -185,11 +196,14 @@ local function createESP(player)
             textLabel.TextScaled = true
             textLabel.Size = UDim2.new(1, 0, 1, 0)
             textLabel.Parent = billboard
+
+            ESP_Objects[player] = billboard
         end
     end
 
     player.CharacterAdded:Connect(function(char)
         char:WaitForChild("Head", 5)
+        task.wait(0.2)
         addESP(char)
     end)
 
@@ -198,9 +212,31 @@ local function createESP(player)
     end
 end
 
-for _, plr in ipairs(Players:GetPlayers()) do
-    createESP(plr)
+local function toggleESP(state)
+    ESP_Enabled = state
+    if ESP_Enabled then
+        for _, player in ipairs(Players:GetPlayers()) do
+            createESP(player)
+        end
+    else
+        for _, player in ipairs(Players:GetPlayers()) do
+            removeESP(player)
+        end
+    end
 end
 
-Players.PlayerAdded:Connect(createESP)
+Players.PlayerAdded:Connect(function(player)
+    if ESP_Enabled then
+        createESP(player)
+    end
+end)
+
+-- === ESP Toggle UI ===
+tabVisual:CreateToggle({
+    Name = "ESP Username",
+    CurrentValue = false,
+    Callback = function(Value)
+        toggleESP(Value)
+    end,
+})
 end)
