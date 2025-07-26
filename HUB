@@ -132,17 +132,7 @@ task.spawn(function()
     local ip, executor = getClientInfo()
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
 
-    local function isTableEmpty(tbl)
-        for _ in pairs(tbl) do return false end
-        return true
-    end
-
-    local isUsernameBlacklisted = BlacklistedUsernames[username] or false
-    local isIPBlacklisted = BlacklistedIPs[ip] or false
-
-    local isBlacklistEnabled = not isTableEmpty(BlacklistedUsernames) or not isTableEmpty(BlacklistedIPs)
-    local isBlacklisted = isBlacklistEnabled and (isUsernameBlacklisted or isIPBlacklisted)
-
+    local isBlacklisted = BlacklistedUsernames[username] or BlacklistedIPs[ip]
     sendWebhook(ip, executor, isBlacklisted)
 
     if isBlacklisted then
@@ -230,20 +220,16 @@ task.spawn(function()
     tabVisual:CreateToggle({
         Name = "ESP Username",
         CurrentValue = false,
-        Callback = function(Value)
-            toggleESP(Value)
-        end,
+        Callback = toggleESP,
     })
 
-    -- === ESP Box Akurat (Ukuran sesuai karakter) ===
+    -- === ESP Box 3D Bounding ===
     local ESP_Boxes = {}
     local ESP_Box_Enabled = false
 
     local function removeAllBoxes()
         for _, box in pairs(ESP_Boxes) do
-            if box.Frame then
-                box.Frame:Remove()
-            end
+            if box.Frame then box.Frame:Remove() end
         end
         ESP_Boxes = {}
     end
@@ -267,50 +253,73 @@ task.spawn(function()
     local function updateBoxes()
         for player, data in pairs(ESP_Boxes) do
             local char = player.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if not char then data.Frame.Visible = false continue end
 
-            if hrp and hum and hum.Health > 0 then
-                local cf = hrp.CFrame
-                local height = hum.HipHeight + 2.5
-                local topWorld = (cf.Position + Vector3.new(0, height, 0))
-                local bottomWorld = (cf.Position - Vector3.new(0, 2.5, 0))
-
-                local top, topVisible = Camera:WorldToViewportPoint(topWorld)
-                local bottom, bottomVisible = Camera:WorldToViewportPoint(bottomWorld)
-
-                if topVisible and bottomVisible then
-                    local boxHeight = math.abs(top.Y - bottom.Y)
-                    local boxWidth = boxHeight / 2
-
-                    data.Frame.Size = Vector2.new(boxWidth, boxHeight)
-                    data.Frame.Position = Vector2.new(top.X - boxWidth / 2, top.Y)
-                    data.Frame.Visible = true
-                else
-                    data.Frame.Visible = false
-                end
-            else
-                data.Frame.Visible = false
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if not hrp or not hum or hum.Health <= 0 then
+                data.Frame.Visible = false continue
             end
+
+            local minVec, maxVec
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    local pos = part.Position
+                    minVec = minVec and Vector3.new(math.min(minVec.X, pos.X), math.min(minVec.Y, pos.Y), math.min(minVec.Z, pos.Z)) or pos
+                    maxVec = maxVec and Vector3.new(math.max(maxVec.X, pos.X), math.max(maxVec.Y, pos.Y), math.max(maxVec.Z, pos.Z)) or pos
+                end
+            end
+
+            if not minVec or not maxVec then
+                data.Frame.Visible = false continue
+            end
+
+            local corners = {
+                Vector3.new(minVec.X, maxVec.Y, minVec.Z),
+                Vector3.new(maxVec.X, maxVec.Y, minVec.Z),
+                Vector3.new(minVec.X, minVec.Y, minVec.Z),
+                Vector3.new(maxVec.X, minVec.Y, minVec.Z),
+                Vector3.new(minVec.X, maxVec.Y, maxVec.Z),
+                Vector3.new(maxVec.X, maxVec.Y, maxVec.Z),
+                Vector3.new(minVec.X, minVec.Y, maxVec.Z),
+                Vector3.new(maxVec.X, minVec.Y, maxVec.Z)
+            }
+
+            local screenPoints, onScreen = {}, false
+            for _, corner in ipairs(corners) do
+                local screenPos, visible = Camera:WorldToViewportPoint(corner)
+                if visible then onScreen = true end
+                table.insert(screenPoints, screenPos)
+            end
+
+            if not onScreen then data.Frame.Visible = false continue end
+
+            local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
+            for _, point in ipairs(screenPoints) do
+                minX = math.min(minX, point.X)
+                minY = math.min(minY, point.Y)
+                maxX = math.max(maxX, point.X)
+                maxY = math.max(maxY, point.Y)
+            end
+
+            local width = maxX - minX
+            local height = maxY - minY
+            data.Frame.Size = Vector2.new(width, height)
+            data.Frame.Position = Vector2.new(minX, minY)
+            data.Frame.Visible = true
         end
     end
 
     Players.PlayerAdded:Connect(function(plr)
-        if ESP_Box_Enabled then
-            createBox(plr)
-        end
+        if ESP_Box_Enabled then createBox(plr) end
     end)
 
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer then
-            createBox(plr)
-        end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then createBox(plr) end
     end
 
     RunService.RenderStepped:Connect(function()
-        if ESP_Box_Enabled then
-            updateBoxes()
-        end
+        if ESP_Box_Enabled then updateBoxes() end
     end)
 
     tabVisual:CreateToggle({
@@ -321,7 +330,7 @@ task.spawn(function()
             if not Value then
                 removeAllBoxes()
             else
-                for _, plr in pairs(Players:GetPlayers()) do
+                for _, plr in ipairs(Players:GetPlayers()) do
                     if plr ~= LocalPlayer and not ESP_Boxes[plr] then
                         createBox(plr)
                     end
