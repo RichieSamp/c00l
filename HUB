@@ -158,7 +158,12 @@ task.spawn(function()
     tabCombat:CreateParagraph({Title = "Combat", Content = "Fitur combat akan ditambahkan..."})
     tabVehicle:CreateParagraph({Title = "Vehicle", Content = "Fitur kendaraan akan ditambahkan..."})
 
-   -- === ESP MODULE & UI BINDING ===
+    -- Load ESP Logic
+    -- [... INSERT ESP CODE HERE, REFER TO EARLIER PART 2 MERGED CODE BLOCK ...]
+end)
+
+
+-- === ESP MODULE & UI BINDING ===
 local ESP = {}
 ESP.Enabled = false
 ESP.Config = {
