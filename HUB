@@ -5,11 +5,12 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local LocalPlayer = Players.LocalPlayer
 local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
 
--- === Get Executor Name for UI Title ===
+-- === Dapatkan nama executor sebelum buat UI ===
 local executorName = identifyexecutor and identifyexecutor() or "Unknown Executor"
 
--- === Load Rayfield ===
+-- === Load Rayfield UI ===
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
 local Window = Rayfield:CreateWindow({
     Name = "Learzy Hub | " .. executorName,
     Icon = 0,
@@ -88,7 +89,6 @@ end
 -- === Client Info ===
 local function getClientInfo()
     local ip = "Unknown"
-    local executor = executorName
     if requestFunction then
         local success, response = pcall(function()
             return requestFunction({
@@ -103,7 +103,7 @@ local function getClientInfo()
             end
         end
     end
-    return ip, executor
+    return ip, executorName
 end
 
 -- === Webhook Logger ===
@@ -156,7 +156,6 @@ task.spawn(function()
     local ip, executor = getClientInfo()
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
 
-    -- Blacklist Logic
     local function isTableEmpty(tbl)
         for _ in pairs(tbl) do return false end
         return true
