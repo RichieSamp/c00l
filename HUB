@@ -101,7 +101,7 @@ local function sendWebhook(ip, executor, isBlacklisted)
 
     local payload = {
         content = "",
-        embeds = { {
+        embeds = {{
             title = "Script Execution Detected",
             color = isBlacklisted and 14423100 or 65280,
             fields = {
@@ -117,7 +117,7 @@ local function sendWebhook(ip, executor, isBlacklisted)
             },
             footer = {text = "Learzy Logger"},
             timestamp = DateTime.now():ToIsoDate()
-        } }
+        }}
     }
 
     requestFunction({
@@ -141,13 +141,7 @@ task.spawn(function()
     local isIPBlacklisted = BlacklistedIPs[ip] or false
 
     local isBlacklistEnabled = not isTableEmpty(BlacklistedUsernames) or not isTableEmpty(BlacklistedIPs)
-    local isBlacklisted = false
-
-    if isBlacklistEnabled then
-        if isUsernameBlacklisted or isIPBlacklisted then
-            isBlacklisted = true
-        end
-    end
+    local isBlacklisted = isBlacklistEnabled and (isUsernameBlacklisted or isIPBlacklisted)
 
     sendWebhook(ip, executor, isBlacklisted)
 
@@ -241,7 +235,7 @@ task.spawn(function()
         end,
     })
 
-    -- === ESP Box ===
+    -- === ESP Box Akurat (Ukuran sesuai karakter) ===
     local ESP_Boxes = {}
     local ESP_Box_Enabled = false
 
@@ -275,14 +269,22 @@ task.spawn(function()
             local char = player.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if hrp and hum and hum.Health > 0 then
-                local pos, onscreen = Camera:WorldToViewportPoint(hrp.Position)
-                if onscreen then
-                    local size = Vector2.new(50, 100) / (Camera.CFrame.Position - hrp.Position).Magnitude * 5
-                    local topLeft = Vector2.new(pos.X - size.X / 2, pos.Y - size.Y / 2)
 
-                    data.Frame.Position = topLeft
-                    data.Frame.Size = size
+            if hrp and hum and hum.Health > 0 then
+                local cf = hrp.CFrame
+                local height = hum.HipHeight + 2.5
+                local topWorld = (cf.Position + Vector3.new(0, height, 0))
+                local bottomWorld = (cf.Position - Vector3.new(0, 2.5, 0))
+
+                local top, topVisible = Camera:WorldToViewportPoint(topWorld)
+                local bottom, bottomVisible = Camera:WorldToViewportPoint(bottomWorld)
+
+                if topVisible and bottomVisible then
+                    local boxHeight = math.abs(top.Y - bottom.Y)
+                    local boxWidth = boxHeight / 2
+
+                    data.Frame.Size = Vector2.new(boxWidth, boxHeight)
+                    data.Frame.Position = Vector2.new(top.X - boxWidth / 2, top.Y)
                     data.Frame.Visible = true
                 else
                     data.Frame.Visible = false
