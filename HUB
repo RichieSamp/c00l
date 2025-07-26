@@ -164,9 +164,8 @@ task.spawn(function()
     tabCombat:CreateParagraph({Title = "Combat", Content = "Fitur combat akan ditambahkan..."})
     tabVehicle:CreateParagraph({Title = "Vehicle", Content = "Fitur kendaraan akan ditambahkan..."})
     
--- === ESP Toggle Setup ===
+-- === ESP Final (Ukuran kecil, stroke hitam, offset tinggi) ===
 local ESP_Enabled = false
-local ESP_Objects = {}
 
 local function removeESP(player)
     if player.Character and player.Character:FindFirstChild("UsernameESP") then
@@ -184,8 +183,8 @@ local function createESP(player)
             billboard.Name = "UsernameESP"
             billboard.Adornee = head
             billboard.AlwaysOnTop = true
-            billboard.Size = UDim2.new(0, 100, 0, 30)
-            billboard.StudsOffset = Vector3.new(0, 2, 0)
+            billboard.Size = UDim2.new(0, 80, 0, 20)
+            billboard.StudsOffset = Vector3.new(0, 2.8, 0)
             billboard.Parent = character
 
             local textLabel = Instance.new("TextLabel")
@@ -197,7 +196,10 @@ local function createESP(player)
             textLabel.Size = UDim2.new(1, 0, 1, 0)
             textLabel.Parent = billboard
 
-            ESP_Objects[player] = billboard
+            local stroke = Instance.new("UIStroke")
+            stroke.Thickness = 1.2
+            stroke.Color = Color3.new(0, 0, 0)
+            stroke.Parent = textLabel
         end
     end
 
@@ -214,12 +216,10 @@ end
 
 local function toggleESP(state)
     ESP_Enabled = state
-    if ESP_Enabled then
-        for _, player in ipairs(Players:GetPlayers()) do
+    for _, player in ipairs(Players:GetPlayers()) do
+        if state then
             createESP(player)
-        end
-    else
-        for _, player in ipairs(Players:GetPlayers()) do
+        else
             removeESP(player)
         end
     end
@@ -231,7 +231,7 @@ Players.PlayerAdded:Connect(function(player)
     end
 end)
 
--- === ESP Toggle UI ===
+-- === UI Toggle di tabVisual ===
 tabVisual:CreateToggle({
     Name = "ESP Username",
     CurrentValue = false,
