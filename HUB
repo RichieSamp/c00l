@@ -248,7 +248,16 @@ task.spawn(function()
                 for _, line in ipairs(lines) do line.Visible = false end
                 continue
             end
-            local corners = {
+            -- Tambahkan offset agar box lebih besar dari tubuh
+    local expandX = 1.5
+    local expandYTop = 1.5
+    local expandYBottom = 0.5
+    local expandZ = 1.2
+
+    minVec = minVec - Vector3.new(expandX, expandYBottom, expandZ)
+    maxVec = maxVec + Vector3.new(expandX, expandYTop, expandZ)
+
+    local corners = {
                 Vector3.new(minVec.X, minVec.Y, minVec.Z),
                 Vector3.new(maxVec.X, minVec.Y, minVec.Z),
                 Vector3.new(minVec.X, minVec.Y, maxVec.Z),
