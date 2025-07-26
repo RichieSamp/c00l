@@ -1,280 +1,185 @@
--- === Load Rayfield UI ===
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "Learzy Hub | Tha Bronx 3",
-    Icon = 0,
-    LoadingTitle = "Learzy Hub",
-    LoadingSubtitle = "by Learzy",
-    ShowText = "Rayfield",
-    Theme = "Default",
-    ToggleUIKeybind = "K",
-    ConfigurationSaving = { Enabled = true, FileName = "Big Hub" },
-    Discord = { Enabled = false },
-    KeySystem = false,
-    KeySettings = { SaveKey = true, Key = {"Hello"} }
+   Name = "Learzy Hub | Tha Bronx 3",
+   Icon = 0,
+   LoadingTitle = "Learzy Hub",
+   LoadingSubtitle = "by Learzy",
+   ShowText = "Rayfield",
+   Theme = "Default",
+   ToggleUIKeybind = "K",
+
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = nil,
+      FileName = "Big Hub"
+   },
+
+   Discord = {
+      Enabled = false,
+      Invite = "noinvitelink",
+      RememberJoins = true
+   },
+
+   KeySystem = false,
+   KeySettings = {
+      Title = "Untitled",
+      Subtitle = "Key System",
+      Note = "No method of obtaining the key is provided",
+      FileName = "Key",
+      SaveKey = true,
+      GrabKeyFromSite = false,
+      Key = {"Hello"}
+   }
 })
 
--- === Webhook Logging ===
-local WebhookURL = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCYeKjTyij4iFWSmpzmk5IWtHxtVDA7zCW-CQuuIwozJfU4u8qzS9psCtL9Zjmvi"
-local HttpService = game:GetService("HttpService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request)
-
-local function fetchIP()
-    if not request then return "Unavailable" end
-    local res = request({Url = "https://httpbin.org/ip", Method = "GET"})
-    if res and res.Body then
-        local ok, data = pcall(function() return HttpService:JSONDecode(res.Body) end)
-        if ok and data and data.origin then return data.origin end
-    end
-    return "Unavailable"
-end
-
-local function sendWebhook()
-    if not request then return end
-    task.spawn(function()
-        local ip = fetchIP()
-        local device = identifyexecutor and identifyexecutor() or "Unknown"
-        local payload = {
-            embeds = {{
-                title = "Script Executed",
-                description = "A user ran the script.",
-                color = 65280,
-                fields = {
-                    {name = "Username", value = LocalPlayer.Name, inline = true},
-                    {name = "IP", value = ip, inline = true},
-                    {name = "Executor", value = device, inline = false},
-                    {name = "PlaceId", value = tostring(game.PlaceId), inline = true}
-                },
-                timestamp = DateTime.now():ToIsoDate()
-            }}
-        }
-        request({
-            Url = WebhookURL,
-            Method = "POST",
-            Headers = {["Content-Type"] = "application/json"},
-            Body = HttpService:JSONEncode(payload)
-        })
-    end)
-end
-
-sendWebhook()
-
--- === ESP Drawing API Setup ===
-local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
-local DrawingESP = {}
-local ESP_Toggles = { Box = false, Health = false, Tool = false, Name = false }
-
-local function createBox() local b = Drawing.new("Square"); b.Filled=false; b.Color=Color3.new(1,1,1); b.Thickness=1; b.Visible=false; return b end
-local function createBar() local b = Drawing.new("Square"); b.Filled=true; b.Visible=false; b.Thickness=0; return b end
-local function createText()
-    local t = Drawing.new("Text")
-    t.Size = 14
-    t.Center = true
-    t.Outline = true
-    t.OutlineColor = Color3.new(0,0,0)
-    t.Font = 2
-    t.Visible = false
-    return t
-end
-
-local function clearPlayerESP(player)
-    if DrawingESP[player] then
-        for _, obj in pairs(DrawingESP[player]) do
-            if obj.Remove then obj:Remove() end
-        end
-        DrawingESP[player] = nil
-    end
-end
-
-local function setupCharacterESP(player)
-    player.CharacterAdded:Connect(function()
-        task.wait(0.5)
-        clearPlayerESP(player)
-        DrawingESP[player] = {
-            Box = createBox(),
-            Health = createBar(),
-            Tool = createText(),
-            Name = createText()
-        }
-    end)
-    if player.Character then
-        DrawingESP[player] = {
-            Box = createBox(),
-            Health = createBar(),
-            Tool = createText(),
-            Name = createText()
-        }
-    end
-end
-
-for _, p in ipairs(Players:GetPlayers()) do
-    if p ~= LocalPlayer then setupCharacterESP(p) end
-end
-
-Players.PlayerAdded:Connect(function(p)
-    if p ~= LocalPlayer then setupCharacterESP(p) end
-end)
-
-Players.PlayerRemoving:Connect(function(p)
-    clearPlayerESP(p)
-end)
-
-RunService.RenderStepped:Connect(function()
-    for player, data in pairs(DrawingESP) do
-        local char = player.Character
-        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
-            local hrp = char.HumanoidRootPart
-            local hum = char.Humanoid
-            local _, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-            if onScreen and hum.Health > 0 then
-                local size = Vector3.new(2, 3, 1.5) * 1.5
-                local points = {}
-                for x=-1,1,2 do for y=-1,1,2 do for z=-1,1,2 do
-                    table.insert(points, Camera:WorldToViewportPoint(hrp.Position + Vector3.new(x,y,z)*(size/2)))
-                end end end
-                local minX, minY = math.huge, math.huge
-                local maxX, maxY = -math.huge, -math.huge
-                for _, p in ipairs(points) do
-                    minX = math.min(minX,p.X) minY = math.min(minY,p.Y)
-                    maxX = math.max(maxX,p.X) maxY = math.max(maxY,p.Y)
-                end
-                -- 2D Box
-                if ESP_Toggles.Box then
-                    data.Box.Position = Vector2.new(minX, minY)
-                    data.Box.Size = Vector2.new(maxX - minX, maxY - minY)
-                    data.Box.Visible = true
-                else data.Box.Visible = false end
-                -- Health Bar
-                if ESP_Toggles.Health then
-                    local ratio = math.clamp(hum.Health/hum.MaxHealth,0,1)
-                    data.Health.Size = Vector2.new(4, (maxY - minY)*ratio)
-                    data.Health.Position = Vector2.new(minX - 6, minY + (maxY - minY)*(1-ratio))
-                    data.Health.Color = ratio > 0.5 and Color3.fromRGB(0,255,0) or ratio > 0.2 and Color3.fromRGB(255,255,0) or Color3.fromRGB(255,0,0)
-                    data.Health.Visible = true
-                else data.Health.Visible = false end
-                -- Tool
-                if ESP_Toggles.Tool then
-                    local tool = char:FindFirstChildOfClass("Tool")
-                    data.Tool.Text = tool and tool.Name or ""
-                    data.Tool.Position = Vector2.new((minX+maxX)/2, maxY + 16)
-                    data.Tool.Color = Color3.fromRGB(255,255,0)
-                    data.Tool.Visible = tool ~= nil
-                else data.Tool.Visible = false end
-                -- Username
-                if ESP_Toggles.Name then
-                    data.Name.Text = player.Name
-                    data.Name.Position = Vector2.new((minX+maxX)/2, minY - 16)
-                    data.Name.Color = Color3.fromRGB(255,255,255)
-                    data.Name.Visible = true
-                else data.Name.Visible = false end
-            else
-                for _, obj in pairs(data) do obj.Visible = false end
-            end
-        end
-    end
-end)
-
--- === ESP Tab UI ===
-local Tab = Window:CreateTab("ESP", 4483362458)
-Tab:CreateToggle({ Name = "2D Box", CurrentValue = false, Callback = function(v) ESP_Toggles.Box = v end })
-Tab:CreateToggle({ Name = "Health Bar", CurrentValue = false, Callback = function(v) ESP_Toggles.Health = v end })
-Tab:CreateToggle({ Name = "Tool Name", CurrentValue = false, Callback = function(v) ESP_Toggles.Tool = v end })
-Tab:CreateToggle({ Name = "Username", CurrentValue = false, Callback = function(v) ESP_Toggles.Name = v end })
-
--- === Fly System (Client + Anti-Cheat Safe) ===
-local UIS = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local flying = false
-local flySpeed = 60
-local control = {F=0, B=0, L=0, R=0, U=0, D=0}
-local flyVelocity, flyConn = nil, nil
-
-UIS.InputBegan:Connect(function(i,gpe)
-    if gpe then return end
-    if i.KeyCode == Enum.KeyCode.W then control.F = 1 end
-    if i.KeyCode == Enum.KeyCode.S then control.B = 1 end
-    if i.KeyCode == Enum.KeyCode.A then control.L = 1 end
-    if i.KeyCode == Enum.KeyCode.D then control.R = 1 end
-    if i.KeyCode == Enum.KeyCode.Space then control.U = 1 end
-    if i.KeyCode == Enum.KeyCode.LeftControl then control.D = 1 end
-end)
-UIS.InputEnded:Connect(function(i)
-    if i.KeyCode == Enum.KeyCode.W then control.F = 0 end
-    if i.KeyCode == Enum.KeyCode.S then control.B = 0 end
-    if i.KeyCode == Enum.KeyCode.A then control.L = 0 end
-    if i.KeyCode == Enum.KeyCode.D then control.R = 0 end
-    if i.KeyCode == Enum.KeyCode.Space then control.U = 0 end
-    if i.KeyCode == Enum.KeyCode.LeftControl then control.D = 0 end
-end)
-
-local function startFly()
-    local char = Players.LocalPlayer.Character
-    if not char then return end
-    local hrp = char:WaitForChild("HumanoidRootPart")
-    flyVelocity = Instance.new("BodyVelocity")
-    flyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
-    flyVelocity.Velocity = Vector3.zero
-    flyVelocity.P = 1250
-    flyVelocity.Parent = hrp
-
-    local hum = char:FindFirstChild("Humanoid")
-    if hum then
-        hum.PlatformStand = false
-        hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-        for _, s in pairs(Enum.HumanoidStateType:GetEnumItems()) do
-            pcall(function() hum:SetStateEnabled(s, true) end)
-        end
-    end
-
-    flyConn = RunService.RenderStepped:Connect(function()
-        if not flying then return end
-        local dir = Vector3.zero
-        local cam = workspace.CurrentCamera
-        dir += cam.CFrame.LookVector * (control.F - control.B)
-        dir += cam.CFrame.RightVector * (control.R - control.L)
-        dir += cam.CFrame.UpVector * (control.U - control.D)
-        if dir.Magnitude > 0 then
-            flyVelocity.Velocity = dir.Unit * flySpeed
-        else
-            flyVelocity.Velocity = Vector3.zero
-        end
-    end)
-end
-
-local function stopFly()
-    if flyConn then flyConn:Disconnect() flyConn = nil end
-    if flyVelocity then flyVelocity:Destroy() flyVelocity = nil end
-end
-
--- === Player Tab UI ===
+-- === Tab ===
 local PlayerTab = Window:CreateTab("Player", 4483362458)
 
-PlayerTab:CreateToggle({
-    Name = "Fly",
-    CurrentValue = false,
-    Callback = function(state)
-        flying = state
-        if state then
-            startFly()
-        else
-            stopFly()
+-- === Services ===
+local players = game:GetService("Players")
+local runService = game:GetService("RunService")
+local camera = workspace.CurrentCamera
+local localPlayer = players.LocalPlayer
+
+-- === ESP Configuration ===
+local espEnabled = false
+local teamCheck = false
+
+local boxColor = Color3.fromRGB(255, 0, 0)
+local textColor = Color3.fromRGB(255, 255, 255)
+local healthBarColor = Color3.fromRGB(0, 255, 0)
+local toolColor = Color3.fromRGB(0, 170, 255)
+
+local espObjects = {}
+
+-- === Utility ===
+local function createDrawing(class, props)
+    local obj = Drawing.new(class)
+    for prop, val in pairs(props) do
+        obj[prop] = val
+    end
+    return obj
+end
+
+local function cleanupESP()
+    for player, items in pairs(espObjects) do
+        if not player or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+            for _, drawing in pairs(items) do
+                if drawing.Remove then
+                    drawing:Remove()
+                end
+            end
+            espObjects[player] = nil
         end
+    end
+end
+
+-- === ESP Loop ===
+runService.RenderStepped:Connect(function()
+    if not espEnabled then
+        for _, items in pairs(espObjects) do
+            for _, drawing in pairs(items) do
+                drawing.Visible = false
+            end
+        end
+        return
+    end
+
+    for _, player in ipairs(players:GetPlayers()) do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            if teamCheck and player.Team == localPlayer.Team then
+                if espObjects[player] then
+                    for _, drawing in pairs(espObjects[player]) do
+                        drawing.Visible = false
+                    end
+                end
+                continue
+            end
+
+            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            local head = player.Character:FindFirstChild("Head")
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            if not hrp or not head or not humanoid then continue end
+
+            local screenPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+            if not onScreen then
+                if espObjects[player] then
+                    for _, drawing in pairs(espObjects[player]) do
+                        drawing.Visible = false
+                    end
+                end
+                continue
+            end
+
+            local distance = (camera.CFrame.Position - hrp.Position).Magnitude
+            local scale = 1 / distance * 100
+            local boxWidth = 35 * scale
+            local boxHeight = 55 * scale
+            local boxPos = Vector2.new(screenPos.X - boxWidth / 2, screenPos.Y - boxHeight / 2)
+
+            if not espObjects[player] then
+                espObjects[player] = {
+                    Box = createDrawing("Square", {Thickness = 1, Transparency = 1, Color = boxColor, Filled = false}),
+                    Name = createDrawing("Text", {Size = 13, Color = textColor, Center = true, Outline = true, Font = 2}),
+                    Health = createDrawing("Line", {Thickness = 2, Transparency = 1, Color = healthBarColor}),
+                    Tool = createDrawing("Text", {Size = 12, Color = toolColor, Center = true, Outline = true, Font = 2})
+                }
+            end
+
+            local esp = espObjects[player]
+
+            -- Box
+            esp.Box.Position = boxPos
+            esp.Box.Size = Vector2.new(boxWidth, boxHeight)
+            esp.Box.Visible = true
+
+            -- Name above head
+            local headPos = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
+            esp.Name.Text = player.Name
+            esp.Name.Position = Vector2.new(headPos.X, headPos.Y)
+            esp.Name.Visible = true
+
+            -- Health Bar
+            local hp = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+            local barHeight = boxHeight * hp
+            esp.Health.From = Vector2.new(boxPos.X - 4, boxPos.Y + boxHeight)
+            esp.Health.To = Vector2.new(boxPos.X - 4, boxPos.Y + boxHeight - barHeight)
+            esp.Health.Visible = true
+
+            -- Tool ESP
+            local toolName = ""
+            for _, item in ipairs(player.Character:GetChildren()) do
+                if item:IsA("Tool") then
+                    toolName = item.Name
+                    break
+                end
+            end
+            local toolPos = camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+            esp.Tool.Text = toolName
+            esp.Tool.Position = Vector2.new(toolPos.X, toolPos.Y)
+            esp.Tool.Visible = (toolName ~= "")
+        end
+    end
+
+    cleanupESP()
+end)
+
+-- === Rayfield Controls ===
+PlayerTab:CreateToggle({
+    Name = "ESP Enabled",
+    CurrentValue = false,
+    Flag = "ESP_Toggle",
+    Callback = function(state)
+        espEnabled = state
     end
 })
 
-PlayerTab:CreateSlider({
-    Name = "Fly Speed",
-    Range = {10, 150},
-    Increment = 5,
-    CurrentValue = flySpeed,
-    Suffix = " studs/s",
-    Callback = function(val)
-        if flying then
-            flySpeed = val
-        end
+PlayerTab:CreateToggle({
+    Name = "Team Check",
+    CurrentValue = false,
+    Flag = "ESP_TeamCheck",
+    Callback = function(state)
+        teamCheck = state
     end
 })
