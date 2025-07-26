@@ -136,7 +136,17 @@ task.spawn(function()
     sendWebhook(ip, executor, isBlacklisted)
     if isBlacklisted then showBlacklistScreen() return end
 
+
+    local tabPlayer = Window:CreateTab("Player", 4483362458)
     local tabVisual = Window:CreateTab("Visual", 4483362458)
+    local tabCombat = Window:CreateTab("Combat", 4483362458)
+    local tabVehicle = Window:CreateTab("Vehicle", 4483362458)
+
+    tabPlayer:CreateParagraph({Title = "Player", Content = "Fitur player akan ditambahkan..."})
+    tabVisual:CreateParagraph({Title = "Visual", Content = "ESP Visual tersedia di sini."})
+    tabCombat:CreateParagraph({Title = "Combat", Content = "Fitur combat akan ditambahkan..."})
+    tabVehicle:CreateParagraph({Title = "Vehicle", Content = "Fitur kendaraan akan ditambahkan..."})
+
 
     -- === ESP Username ===
     local ESP_Enabled = false
