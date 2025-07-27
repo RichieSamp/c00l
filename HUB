@@ -18,7 +18,7 @@ local Window = Rayfield:CreateWindow({
 
 -- === Webhook & Blacklist Setup ===
 local WebhookURL = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCYeKjTyij4iFWSmpzmk5IWtHxtVDA7zCW-CQuuIwozJfU4u8qzS9psCtL9Zjmvi"
-local BlacklistedUsernames = {}
+local BlacklistedUsernames = {InfxmousLearzy} = true,
 local BlacklistedIPs = {}
 
 local function showBlacklistScreen()
