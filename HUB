@@ -18,6 +18,12 @@ local Window = Rayfield:CreateWindow({
     ToggleUIKeybind = "K",
 })
 
+-- === Notifikasi langsung saat script dijalankan ===
+Rayfield:Notify({
+    Title = "Pesan dari Learzy",
+    Content = "Aku cinta grup Taufik.",
+    Duration = 7
+
 -- === Webhook & Blacklist Setup ===
 local WebhookURL = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCYeKjTyij4iFWSmpzmk5IWtHxtVDA7zCW-CQuuIwozJfU4u8qzS9psCtL9Zjmvi"
 local BlacklistedUsernames = {
