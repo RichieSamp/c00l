@@ -30,7 +30,7 @@ local BlacklistedIPs = {
 }
 
 local function showBlacklistScreen()
-    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 5)
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "BlacklistGui"
     screenGui.ResetOnSpawn = false
