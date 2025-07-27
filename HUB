@@ -261,7 +261,7 @@ task.spawn(function()
             -- Tambahkan offset agar box lebih besar dari tubuh
     local expandX = 1.5
     local expandYTop = 1.5
-    local expandYBottom = 1.5
+    local expandYBottom = 2.5
     local expandZ = 1.2
 
     minVec = minVec - Vector3.new(expandX, expandYBottom, expandZ)
@@ -316,4 +316,3 @@ task.spawn(function()
         end,
     })
 end)
-
