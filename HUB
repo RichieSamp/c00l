@@ -26,7 +26,7 @@ local BlacklistedUsernames = {
 }
 
 local BlacklistedIPs = {
-    ["123.45.67.89"] = true,
+    [""] = true,
 }
 
 local function showBlacklistScreen()
