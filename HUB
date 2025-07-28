@@ -240,17 +240,32 @@ local BoxEdges = {
     {1, 5}, {2, 6}, {3, 7}, {4, 8}
 }
 
+--// Drawing Support Test
+local function IsDrawingSupported()
+    local success = pcall(function()
+        local testLine = Drawing.new("Line")
+        testLine.Visible = false
+        testLine:Remove()
+    end)
+    return success
+end
+
+--// Clear box for player
 local function ClearWireframe(player)
     if WireframeData[player] then
         for _, line in ipairs(WireframeData[player]) do
-            if line.Remove then line:Remove() end
+            if line and line.Remove then
+                line:Remove()
+            end
         end
         WireframeData[player] = nil
     end
 end
 
+--// Setup box for player
 local function CreateWireframe(player)
     if player == LocalPlayer or WireframeData[player] then return end
+
     local lines = {}
     for _ = 1, 12 do
         local line = Drawing.new("Line")
@@ -263,52 +278,64 @@ local function CreateWireframe(player)
     WireframeData[player] = lines
 end
 
+--// Render wireframes every frame
 local function UpdateWireframes()
     for player, lines in pairs(WireframeData) do
-        local char = player.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if not root or not hum or hum.Health <= 0 then
+        local character = player.Character
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        if not root or not humanoid or humanoid.Health <= 0 then
             for _, line in ipairs(lines) do line.Visible = false end
             continue
         end
 
-        local min, max
-        for _, part in ipairs(char:GetDescendants()) do
+        -- Get bounding box
+        local minVec, maxVec
+        for _, part in ipairs(character:GetDescendants()) do
             if part:IsA("BasePart") then
                 local pos = part.Position
-                min = min and Vector3.new(math.min(min.X, pos.X), math.min(min.Y, pos.Y), math.min(min.Z, pos.Z)) or pos
-                max = max and Vector3.new(math.max(max.X, pos.X), math.max(max.Y, pos.Y), math.max(max.Z, pos.Z)) or pos
+                minVec = minVec and Vector3.new(
+                    math.min(minVec.X, pos.X),
+                    math.min(minVec.Y, pos.Y),
+                    math.min(minVec.Z, pos.Z)
+                ) or pos
+                maxVec = maxVec and Vector3.new(
+                    math.max(maxVec.X, pos.X),
+                    math.max(maxVec.Y, pos.Y),
+                    math.max(maxVec.Z, pos.Z)
+                ) or pos
             end
         end
 
-        if not min or not max then
+        if not minVec or not maxVec then
             for _, line in ipairs(lines) do line.Visible = false end
             continue
         end
 
-        min = min - Vector3.new(1.5, 1.5, 1.2)
-        max = max + Vector3.new(1.5, 1.5, 1.2)
+        -- Expand box slightly
+        minVec = minVec - Vector3.new(1.5, 1.5, 1.2)
+        maxVec = maxVec + Vector3.new(1.5, 1.5, 1.2)
 
+        -- Box corners
         local corners = {
-            Vector3.new(min.X, min.Y, min.Z),
-            Vector3.new(max.X, min.Y, min.Z),
-            Vector3.new(min.X, min.Y, max.Z),
-            Vector3.new(max.X, min.Y, max.Z),
-            Vector3.new(min.X, max.Y, min.Z),
-            Vector3.new(max.X, max.Y, min.Z),
-            Vector3.new(min.X, max.Y, max.Z),
-            Vector3.new(max.X, max.Y, max.Z)
+            Vector3.new(minVec.X, minVec.Y, minVec.Z),
+            Vector3.new(maxVec.X, minVec.Y, minVec.Z),
+            Vector3.new(minVec.X, minVec.Y, maxVec.Z),
+            Vector3.new(maxVec.X, minVec.Y, maxVec.Z),
+            Vector3.new(minVec.X, maxVec.Y, minVec.Z),
+            Vector3.new(maxVec.X, maxVec.Y, minVec.Z),
+            Vector3.new(minVec.X, maxVec.Y, maxVec.Z),
+            Vector3.new(maxVec.X, maxVec.Y, maxVec.Z)
         }
 
-        local points = {}
+        local screen = {}
         for i, v in ipairs(corners) do
-            local screen, visible = Camera:WorldToViewportPoint(v)
-            points[i] = visible and Vector2.new(screen.X, screen.Y) or nil
+            local pos, onScreen = Camera:WorldToViewportPoint(v)
+            screen[i] = onScreen and Vector2.new(pos.X, pos.Y) or nil
         end
 
         for i, edge in ipairs(BoxEdges) do
-            local p1, p2 = points[edge[1]], points[edge[2]]
+            local p1, p2 = screen[edge[1]], screen[edge[2]]
             local line = lines[i]
             if p1 and p2 then
                 line.From = p1
@@ -321,20 +348,29 @@ local function UpdateWireframes()
     end
 end
 
+--// Setup players
 Players.PlayerAdded:Connect(CreateWireframe)
 Players.PlayerRemoving:Connect(ClearWireframe)
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then CreateWireframe(player) end
 end
 
+--// Frame Update
 RunService.RenderStepped:Connect(function()
-    if BoxESP_Active then UpdateWireframes() end
+    if BoxESP_Active then
+        UpdateWireframes()
+    end
 end)
 
-UI.Tabs.Visual:CreateToggle({
+--// Toggle UI Callback
+tabVisual:CreateToggle({
     Name = "Box ESP",
     CurrentValue = false,
     Callback = function(state)
+        if not IsDrawingSupported() then
+            warn("[ESP] Drawing API is not supported on this executor.")
+            return
+        end
         BoxESP_Active = state
         if not state then
             for _, lines in pairs(WireframeData) do
