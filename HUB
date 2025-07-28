@@ -6,8 +6,9 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-
 local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
+
+-- === Executor Name sebelum UI ===
 local executorName = identifyexecutor and identifyexecutor() or "Unknown Executor"
 
 -- === Load Rayfield UI ===
@@ -18,220 +19,250 @@ local Window = Rayfield:CreateWindow({
     ToggleUIKeybind = "K",
 })
 
--- === Webhook & Blacklist ===
+-- === Tabs ===
+local tabPlayer = Window:CreateTab("Player", 4483362458)
+local tabVisual = Window:CreateTab("Visual", 4483362458)
+local tabCombat = Window:CreateTab("Combat", 4483362458)
+local tabVehicle = Window:CreateTab("Vehicle", 4483362458)
+
+-- === Logger & Blacklist ===
 local WebhookURL = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCYeKjTyij4iFWSmpzmk5IWtHxtVDA7zCW-CQuuIwozJfU4u8qzS9psCtL9Zjmvi"
-local BlacklistedUsernames = {["playerkontoo"] = true, ["Player123"] = true}
-local BlacklistedIPs = {["123.456.78.910"] = true}
-
-local function showBlacklistScreen()
-    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 5)
-    local screenGui = Instance.new("ScreenGui", PlayerGui)
-    screenGui.Name = "BlacklistGui"
-    screenGui.DisplayOrder = -1000
-    screenGui.ResetOnSpawn = false
-
-    local frame = Instance.new("Frame", screenGui)
-    frame.BackgroundColor3 = Color3.new(0, 0, 0)
-    frame.Size = UDim2.new(10, 0, 10, 0)
-    frame.Position = UDim2.new(-4.5, 0, -4.5, 0)
-
-    local text = Instance.new("TextLabel", screenGui)
-    text.Text = "Kamu telah di blacklist"
-    text.TextColor3 = Color3.new(1, 0, 0)
-    text.Font = Enum.Font.SourceSansBold
-    text.BackgroundTransparency = 1
-    text.TextScaled = true
-    text.Size = UDim2.new(1, 0, 0.15, 0)
-    text.Position = UDim2.new(0, 0, 0.425, 0)
-end
-
-local function getCountryFromIP(ip)
-    if not requestFunction then return "Unknown", "" end
-    local resp = requestFunction({ Url = "http://ip-api.com/json/" .. ip .. "?fields=status,country,countryCode", Method = "GET" })
-    if not resp or not resp.Body then return "Unknown", "" end
-    local ok, data = pcall(HttpService.JSONDecode, HttpService, resp.Body)
-    if ok and data.status == "success" then
-        return data.country, data.countryCode
-    end
-    return "Unknown", ""
-end
-
-local function countryFlagEmoji(code)
-    if not code or #code ~= 2 then return "" end
-    local OFFSET = 127397
-    return utf8.char(OFFSET + code:sub(1,1):byte(), OFFSET + code:sub(2,2):byte())
-end
+local BlacklistedUsernames = {["playerkontoo"] = true}
+local BlacklistedIPs = {}
 
 local function getClientInfo()
-    if not requestFunction then return "Unknown", executorName end
-    local resp = requestFunction({ Url = "https://httpbin.org/ip", Method = "GET" })
-    if not resp or not resp.Body then return "Unknown", executorName end
-    local ok, data = pcall(HttpService.JSONDecode, HttpService, resp.Body)
-    if ok and data.origin then
-        return data.origin:split(",")[1]:gsub("^%s*(.-)%s*$", "%1"), executorName
+    local ip = "Unknown"
+    if requestFunction then
+        local resp = requestFunction({ Url = "https://httpbin.org/ip", Method = "GET" })
+        if resp and resp.Body then
+            local ok, d = pcall(HttpService.JSONDecode, HttpService, resp.Body)
+            if ok and d and d.origin then
+                ip = d.origin:split(",")[1]:gsub("^%s*(.-)%s*$", "%1")
+            end
+        end
     end
-    return "Unknown", executorName
+    return ip, executorName
 end
 
-local function sendWebhook(ip, executor, isBlacklisted)
-    local username = LocalPlayer and LocalPlayer.Name or "Unknown"
-    local country, code = getCountryFromIP(ip)
-    local flag = countryFlagEmoji(code)
-
-    local gameName = "Unknown"
-    local ok, info = pcall(MarketplaceService.GetProductInfo, MarketplaceService, game.PlaceId)
-    if ok and info and info.Name then gameName = info.Name end
-
-    local data = {
-        content = "",
-        embeds = {{
-            title = "Script Execution Detected",
-            color = isBlacklisted and 14423100 or 65280,
-            fields = {
-                {name = "Username", value = username, inline = true},
-                {name = "IP", value = ip, inline = true},
-                {name = "Country", value = country .. " " .. flag, inline = true},
-                {name = "Executor", value = executor, inline = false},
-                {name = "Game Name", value = gameName, inline = false},
-                {name = "Game ID", value = tostring(game.PlaceId), inline = true},
-                {name = "Job ID", value = tostring(game.JobId), inline = true},
-                {name = "Blacklisted", value = isBlacklisted and "Yes" or "No", inline = true}
-            },
-            footer = {text = "Learzy Logger"},
-            timestamp = DateTime.now():ToIsoDate()
-        }}
-    }
-    requestFunction({
-        Url = WebhookURL,
-        Method = "POST",
-        Headers = {["Content-Type"] = "application/json"},
-        Body = HttpService:JSONEncode(data)
-    })
+local function showBlacklistScreen()
+    local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+    local frame = Instance.new("Frame", gui)
+    frame.Size = UDim2.new(10, 0, 10, 0)
+    frame.Position = UDim2.new(-4.5, 0, -4.5, 0)
+    frame.BackgroundColor3 = Color3.new(0, 0, 0)
+    local label = Instance.new("TextLabel", gui)
+    label.Size = UDim2.new(1, 0, 0.15, 0)
+    label.Position = UDim2.new(0, 0, 0.425, 0)
+    label.Text = "Kamu telah di blacklist"
+    label.TextColor3 = Color3.fromRGB(255, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.SourceSansBold
+    label.TextScaled = true
 end
 
--- === Main Task Execution ===
 task.spawn(function()
     local ip, executor = getClientInfo()
     local isBlacklisted = BlacklistedUsernames[LocalPlayer.Name] or BlacklistedIPs[ip]
-    sendWebhook(ip, executor, isBlacklisted)
-    if isBlacklisted then showBlacklistScreen() return end
+    if isBlacklisted then
+        showBlacklistScreen()
+        return
+    end
+end)
 
-    local tabPlayer = Window:CreateTab("Player", 4483362458)
-    local tabVisual = Window:CreateTab("Visual", 4483362458)
-    Window:CreateTab("Combat", 4483362458):CreateParagraph({Title="Combat", Content="Coming Soon"})
-    Window:CreateTab("Vehicle", 4483362458):CreateParagraph({Title="Vehicle", Content="Coming Soon"})
-
-    -- === ESP Username ===
-    local ESP_Enabled = false
-    local function handleESP(char, player)
-        if not ESP_Enabled or player == LocalPlayer then return end
-        local head = char:FindFirstChild("Head")
-        if head and not char:FindFirstChild("UsernameESP") then
-            local gui = Instance.new("BillboardGui", char)
+-- === ESP Username ===
+local ESP_Enabled = false
+local function createESP(player)
+    if player == LocalPlayer then return end
+    player.CharacterAdded:Connect(function(character)
+        task.wait(0.5)
+        local head = character:WaitForChild("Head", 3)
+        if head and ESP_Enabled then
+            local gui = Instance.new("BillboardGui", character)
             gui.Name = "UsernameESP"
             gui.Adornee = head
-            gui.AlwaysOnTop = true
             gui.Size = UDim2.new(0, 60, 0, 16)
+            gui.AlwaysOnTop = true
             gui.StudsOffset = Vector3.new(0, 3, 0)
 
             local label = Instance.new("TextLabel", gui)
-            label.Text = player.Name
-            label.Font = Enum.Font.SourceSansBold
-            label.TextColor3 = Color3.new(1, 1, 1)
-            label.BackgroundTransparency = 1
-            label.TextScaled = true
             label.Size = UDim2.new(1, 0, 1, 0)
-
-            local stroke = Instance.new("UIStroke", label)
-            stroke.Thickness = 2
-            stroke.Color = Color3.new(0, 0, 0)
-        end
-    end
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player.Character then handleESP(player.Character, player) end
-        player.CharacterAdded:Connect(function(char)
-            task.wait(0.3)
-            handleESP(char, player)
-        end)
-    end
-
-    tabVisual:CreateToggle({
-        Name = "ESP Username",
-        CurrentValue = false,
-        Callback = function(state)
-            ESP_Enabled = state
-        end
-    })
-
-    -- === Fly ===
-    local speed = 60
-    local flying = false
-    local moveDir = Vector3.zero
-    local char, humanoid, hrp = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    humanoid = char:WaitForChild("Humanoid")
-    hrp = char:WaitForChild("HumanoidRootPart")
-
-    local anim = Instance.new("Animation")
-    anim.AnimationId = "rbxassetid://180436334"
-    local flyAnim
-
-    local flyVel = Instance.new("BodyVelocity")
-    flyVel.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-    flyVel.P = 1250
-    flyVel.Velocity = Vector3.zero
-
-    UserInputService.InputBegan:Connect(function(i, g)
-        if g then return end
-        local k = i.KeyCode
-        if k == Enum.KeyCode.W then moveDir += Vector3.new(0, 0, -1) end
-        if k == Enum.KeyCode.S then moveDir += Vector3.new(0, 0, 1) end
-        if k == Enum.KeyCode.A then moveDir += Vector3.new(-1, 0, 0) end
-        if k == Enum.KeyCode.D then moveDir += Vector3.new(1, 0, 0) end
-        if k == Enum.KeyCode.Space then moveDir += Vector3.new(0, 1, 0) end
-        if k == Enum.KeyCode.LeftControl then moveDir += Vector3.new(0, -1, 0) end
-    end)
-
-    UserInputService.InputEnded:Connect(function(i)
-        local k = i.KeyCode
-        if k == Enum.KeyCode.W then moveDir -= Vector3.new(0, 0, -1) end
-        if k == Enum.KeyCode.S then moveDir -= Vector3.new(0, 0, 1) end
-        if k == Enum.KeyCode.A then moveDir -= Vector3.new(-1, 0, 0) end
-        if k == Enum.KeyCode.D then moveDir -= Vector3.new(1, 0, 0) end
-        if k == Enum.KeyCode.Space then moveDir -= Vector3.new(0, 1, 0) end
-        if k == Enum.KeyCode.LeftControl then moveDir -= Vector3.new(0, -1, 0) end
-    end)
-
-    RunService.RenderStepped:Connect(function()
-        if flying then
-            flyVel.Velocity = workspace.CurrentCamera.CFrame:VectorToWorldSpace(moveDir * speed)
+            label.Text = player.Name
+            label.BackgroundTransparency = 1
+            label.TextColor3 = Color3.new(1, 1, 1)
+            label.Font = Enum.Font.SourceSansBold
+            label.TextScaled = true
         end
     end)
+end
 
-    tabPlayer:CreateToggle({
-        Name = "Fly (Undetected)",
-        CurrentValue = false,
-        Callback = function(state)
-            flying = state
+tabVisual:CreateToggle({
+    Name = "ESP Username",
+    CurrentValue = false,
+    Callback = function(state)
+        ESP_Enabled = state
+        for _, player in ipairs(Players:GetPlayers()) do
             if state then
-                flyVel.Parent = hrp
-                flyAnim = humanoid:LoadAnimation(anim)
-                flyAnim:Play()
+                createESP(player)
             else
-                flyVel.Parent = nil
-                if flyAnim then flyAnim:Stop() flyAnim = nil end
+                if player.Character and player.Character:FindFirstChild("UsernameESP") then
+                    player.Character:FindFirstChild("UsernameESP"):Destroy()
+                end
             end
         end
-    })
+    end,
+})
 
-    tabPlayer:CreateSlider({
-        Name = "Fly Speed",
-        Range = {10, 150},
-        Increment = 5,
-        Suffix = "stud/s",
-        CurrentValue = speed,
-        Callback = function(val)
-            speed = val
+-- === ESP Box ===
+local ESP_Box_Enabled = false
+local ESP_Wireframes = {}
+
+local function updateWireframes()
+    for player, lines in pairs(ESP_Wireframes) do
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then
+            for _, l in ipairs(lines) do l.Visible = false end
+            continue
         end
-    })
+        local cf, size = hrp.CFrame, hrp.Size + Vector3.new(2, 4, 2)
+        local corners = {}
+        for x = -1, 1, 2 do
+            for y = -1, 1, 2 do
+                for z = -1, 1, 2 do
+                    table.insert(corners, (cf * CFrame.new(size.X/2*x, size.Y/2*y, size.Z/2*z)).Position)
+                end
+            end
+        end
+        local edges = {
+            {1,2},{1,3},{1,5},{2,4},{2,6},{3,4},{3,7},{4,8},
+            {5,6},{5,7},{6,8},{7,8}
+        }
+        for i, edge in ipairs(edges) do
+            local p1, p2 = corners[edge[1]], corners[edge[2]]
+            local v1, o1 = Camera:WorldToViewportPoint(p1)
+            local v2, o2 = Camera:WorldToViewportPoint(p2)
+            local line = lines[i]
+            if o1 and o2 then
+                line.Visible = true
+                line.From = Vector2.new(v1.X, v1.Y)
+                line.To = Vector2.new(v2.X, v2.Y)
+            else
+                line.Visible = false
+            end
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if ESP_Box_Enabled then updateWireframes() end
 end)
+
+tabVisual:CreateToggle({
+    Name = "ESP Box",
+    CurrentValue = false,
+    Callback = function(state)
+        ESP_Box_Enabled = state
+        if state then
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and not ESP_Wireframes[player] then
+                    local lines = {}
+                    for _ = 1, 12 do
+                        local line = Drawing.new("Line")
+                        line.Thickness = 2
+                        line.Color = Color3.new(1, 1, 1)
+                        line.Visible = false
+                        table.insert(lines, line)
+                    end
+                    ESP_Wireframes[player] = lines
+                end
+            end
+        else
+            for _, lines in pairs(ESP_Wireframes) do
+                for _, line in ipairs(lines) do line.Visible = false end
+            end
+        end
+    end,
+})
+
+-- === Fly System (Undetected + Animasi) ===
+local flying = false
+local speed = 60
+local direction = Vector3.zero
+local velocity, gyro, animTrack
+
+local function setupFly()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+
+    if not humanoid or not hrp then return end
+
+    velocity = Instance.new("BodyVelocity")
+    velocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+    velocity.P = 1250
+    velocity.Velocity = Vector3.zero
+    velocity.Parent = hrp
+
+    gyro = Instance.new("BodyGyro")
+    gyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+    gyro.P = 3000
+    gyro.CFrame = hrp.CFrame
+    gyro.Parent = hrp
+
+    local anim = Instance.new("Animation")
+    anim.AnimationId = "rbxassetid://180426354"
+    animTrack = humanoid:LoadAnimation(anim)
+    animTrack:Play()
+end
+
+local function stopFly()
+    if velocity then velocity:Destroy() end
+    if gyro then gyro:Destroy() end
+    if animTrack then animTrack:Stop() end
+    velocity, gyro, animTrack = nil, nil, nil
+end
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.W then direction = Vector3.new(0, 0, -1)
+    elseif input.KeyCode == Enum.KeyCode.S then direction = Vector3.new(0, 0, 1)
+    elseif input.KeyCode == Enum.KeyCode.A then direction = Vector3.new(-1, 0, 0)
+    elseif input.KeyCode == Enum.KeyCode.D then direction = Vector3.new(1, 0, 0)
+    elseif input.KeyCode == Enum.KeyCode.Space then direction = Vector3.new(0, 1, 0)
+    elseif input.KeyCode == Enum.KeyCode.LeftControl then direction = Vector3.new(0, -1, 0) end
+end)
+
+UserInputService.InputEnded:Connect(function()
+    direction = Vector3.zero
+end)
+
+RunService.RenderStepped:Connect(function()
+    if flying and velocity and gyro then
+        local camCF = workspace.CurrentCamera.CFrame
+        local dir = (camCF:VectorToWorldSpace(direction)).Unit * speed
+        velocity.Velocity = dir
+        gyro.CFrame = CFrame.new(Vector3.zero, camCF.LookVector)
+    end
+end)
+
+tabPlayer:CreateToggle({
+    Name = "Fly",
+    CurrentValue = false,
+    Callback = function(state)
+        flying = state
+        if state then
+            setupFly()
+        else
+            stopFly()
+        end
+    end
+})
+
+tabPlayer:CreateSlider({
+    Name = "Fly Speed",
+    Range = {10, 150},
+    Increment = 5,
+    CurrentValue = speed,
+    Callback = function(val) speed = val end
+})
