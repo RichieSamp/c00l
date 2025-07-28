@@ -1,4 +1,3 @@
--- === Services ===
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -7,10 +6,8 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
 
--- === Executor Name sebelum UI ===
 local executorName = identifyexecutor and identifyexecutor() or "Unknown Executor"
 
--- === Load Rayfield UI ===
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
     Name = "Learzy Hub | " .. executorName,
@@ -18,45 +15,28 @@ local Window = Rayfield:CreateWindow({
     ToggleUIKeybind = "K",
 })
 
--- === Webhook & Blacklist Setup ===
 local WebhookURL = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCYeKjTyij4iFWSmpzmk5IWtHxtVDA7zCW-CQuuIwozJfU4u8qzS9psCtL9Zjmvi"
-local BlacklistedUsernames = {
-    ["playerkontoo"] = true,
-    ["Player123"] = true,
-}
-
-local BlacklistedIPs = {
-    ["123.456.78.910"] = true,
-}
+local BlacklistedUsernames = {["playerkontoo"] = true, ["Player123"] = true}
+local BlacklistedIPs = {["123.456.78.910"] = true}
 
 local function showBlacklistScreen()
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 5)
-    local screenGui = Instance.new("ScreenGui")
+    local screenGui = Instance.new("ScreenGui", PlayerGui)
     screenGui.Name = "BlacklistGui"
     screenGui.ResetOnSpawn = false
-    screenGui.IgnoreGuiInset = false
     screenGui.DisplayOrder = -1000
-    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screenGui.Parent = PlayerGui
-
-    local blackFrame = Instance.new("Frame")
+    local blackFrame = Instance.new("Frame", screenGui)
     blackFrame.BackgroundColor3 = Color3.new(0, 0, 0)
-    blackFrame.BackgroundTransparency = 0
     blackFrame.Size = UDim2.new(10, 0, 10, 0)
     blackFrame.Position = UDim2.new(-4.5, 0, -4.5, 0)
-    blackFrame.BorderSizePixel = 0
-    blackFrame.Parent = screenGui
-
-    local label = Instance.new("TextLabel")
+    local label = Instance.new("TextLabel", screenGui)
     label.Text = "Kamu telah di blacklist"
     label.TextColor3 = Color3.fromRGB(255, 0, 0)
     label.BackgroundTransparency = 1
     label.Font = Enum.Font.SourceSansBold
     label.TextScaled = true
-    label.TextWrapped = true
     label.Size = UDim2.new(1, 0, 0.15, 0)
     label.Position = UDim2.new(0, 0, 0.425, 0)
-    label.Parent = screenGui
 end
 
 local function getCountryFromIP(ip)
@@ -90,7 +70,7 @@ local function getClientInfo()
         if resp and resp.Body then
             local ok, d = pcall(HttpService.JSONDecode, HttpService, resp.Body)
             if ok and d and d.origin then
-                ip = d.origin:split(",")[1]:gsub("^%s*(.-)%s*$", "%1") -- Ambil IP utama dan trim whitespace
+                ip = d.origin:split(",")[1]:gsub("^%s*(.-)%s*$", "%1")
             end
         end
     end
@@ -136,7 +116,7 @@ local function sendWebhook(ip, executor, isBlacklisted)
     })
 end
 
--- === Jalankan Blacklist Check ===
+-- Jalankan Blacklist Check dan UI
 task.spawn(function()
     local ip, executor = getClientInfo()
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
@@ -159,7 +139,6 @@ task.spawn(function()
     tabVisual:CreateParagraph({Title = "Visual", Content = "ESP Visual tersedia di sini."})
     tabCombat:CreateParagraph({Title = "Combat", Content = "Fitur combat akan ditambahkan..."})
     tabVehicle:CreateParagraph({Title = "Vehicle", Content = "Fitur kendaraan akan ditambahkan..."})
-
 
     -- === ESP Username ===
     local ESP_Enabled = false
@@ -271,16 +250,15 @@ task.spawn(function()
                 for _, line in ipairs(lines) do line.Visible = false end
                 continue
             end
-            -- Tambahkan offset agar box lebih besar dari tubuh
-    local expandX = 1.5
-    local expandYTop = 1.5
-    local expandYBottom = 1.5
-    local expandZ = 1.2
+            local expandX = 1.5
+            local expandYTop = 1.5
+            local expandYBottom = 1.5
+            local expandZ = 1.2
 
-    minVec = minVec - Vector3.new(expandX, expandYBottom, expandZ)
-    maxVec = maxVec + Vector3.new(expandX, expandYTop, expandZ)
+            minVec = minVec - Vector3.new(expandX, expandYBottom, expandZ)
+            maxVec = maxVec + Vector3.new(expandX, expandYTop, expandZ)
 
-    local corners = {
+            local corners = {
                 Vector3.new(minVec.X, minVec.Y, minVec.Z),
                 Vector3.new(maxVec.X, minVec.Y, minVec.Z),
                 Vector3.new(minVec.X, minVec.Y, maxVec.Z),
@@ -328,4 +306,85 @@ task.spawn(function()
             end
         end,
     })
+    
+    -- === Fly System (Rayfield Toggle + Mobile Support) ===
+    local speed = 50
+    local flying = false
+    local moveDir = Vector3.zero
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = character:WaitForChild("HumanoidRootPart")
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "FlyBV"
+    bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bv.P = 1e4
+    bv.Velocity = Vector3.zero
+
+    local bg = Instance.new("BodyGyro")
+    bg.Name = "FlyBG"
+    bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    bg.P = 1e4
+    bg.CFrame = hrp.CFrame
+
+    local function setFly(state)
+        flying = state
+        if flying then
+            bv.Parent = hrp
+            bg.Parent = hrp
+        else
+            bv.Parent = nil
+            bg.Parent = nil
+            moveDir = Vector3.zero
+        end
+    end
+
+    tabPlayer:CreateToggle({
+        Name = "Fly (Undetected + Mobile)",
+        CurrentValue = false,
+        Callback = setFly
+    })
+
+    RunService.RenderStepped:Connect(function()
+        if flying then
+            local camCF = workspace.CurrentCamera.CFrame
+            local forward = camCF.LookVector
+            local right = camCF.RightVector
+            local up = Vector3.new(0, 1, 0)
+            local dir = Vector3.zero
+            dir += moveDir.X * right
+            dir += moveDir.Y * up
+            dir += moveDir.Z * forward
+            if dir.Magnitude > 0 then dir = dir.Unit end
+            bv.Velocity = dir * speed
+            bg.CFrame = CFrame.new(Vector3.zero, forward)
+        end
+    end)
+
+    -- === Mobile GUI Buttons for Fly ===
+    local screenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+    screenGui.Name = "FlyTouchGUI"
+    screenGui.ResetOnSpawn = false
+
+    local function createButton(name, pos, size, text, callback)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, size.X, 0, size.Y)
+        btn.Position = UDim2.new(0, pos.X, 0, pos.Y)
+        btn.Text = text
+        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.TextScaled = true
+        btn.Parent = screenGui
+        btn.AutoButtonColor = true
+        btn.Name = name
+        btn.MouseButton1Down:Connect(callback)
+        btn.MouseButton1Up:Connect(function()
+            if name ~= "Toggle" then moveDir = Vector3.zero end
+        end)
+    end
+
+    createButton("Toggle", Vector2.new(20, 500), Vector2.new(100, 50), "Fly", function() setFly(not flying) end)
+    createButton("Up", Vector2.new(130, 430), Vector2.new(50, 50), "↑", function() moveDir = Vector3.new(0, 1, 0) end)
+    createButton("Down", Vector2.new(130, 500), Vector2.new(50, 50), "↓", function() moveDir = Vector3.new(0, -1, 0) end)
+    createButton("Forward", Vector2.new(190, 465), Vector2.new(50, 50), "→", function() moveDir = Vector3.new(0, 0, 1) end)
+    createButton("Back", Vector2.new(70, 465), Vector2.new(50, 50), "←", function() moveDir = Vector3.new(0, 0, -1) end)
 end)
