@@ -306,85 +306,80 @@ task.spawn(function()
             end
         end,
     })
-    
-    -- === Fly System (Rayfield Toggle + Mobile Support) ===
-    local speed = 50
-    local flying = false
-    local moveDir = Vector3.zero
-    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp = character:WaitForChild("HumanoidRootPart")
 
-    local bv = Instance.new("BodyVelocity")
-    bv.Name = "FlyBV"
-    bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-    bv.P = 1e4
-    bv.Velocity = Vector3.zero
+    -- === Fly System (Undetected + Animation) ===
+local speed = 50
+local flying = false
+local direction = Vector3.zero
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
 
-    local bg = Instance.new("BodyGyro")
-    bg.Name = "FlyBG"
-    bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
-    bg.P = 1e4
-    bg.CFrame = hrp.CFrame
+local flyAnim = Instance.new("Animation")
+flyAnim.AnimationId = "rbxassetid://507771019"
+local flyTrack = humanoid:LoadAnimation(flyAnim)
 
-    local function setFly(state)
-        flying = state
-        if flying then
-            bv.Parent = hrp
-            bg.Parent = hrp
-        else
-            bv.Parent = nil
-            bg.Parent = nil
-            moveDir = Vector3.zero
+local bv = Instance.new("BodyVelocity")
+bv.Name = "FlyBV"
+bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+bv.P = 1250
+bv.Velocity = Vector3.zero
+
+local function setFly(state)
+    flying = state
+    if flying then
+        bv.Parent = hrp
+        bv.Velocity = Vector3.zero
+        if not flyTrack.IsPlaying then
+            flyTrack:Play()
+            flyTrack:AdjustSpeed(1)
         end
-    end
-
-    tabPlayer:CreateToggle({
-        Name = "Fly (Undetected + Mobile)",
-        CurrentValue = false,
-        Callback = setFly
-    })
-
-    RunService.RenderStepped:Connect(function()
-        if flying then
-            local camCF = workspace.CurrentCamera.CFrame
-            local forward = camCF.LookVector
-            local right = camCF.RightVector
-            local up = Vector3.new(0, 1, 0)
-            local dir = Vector3.zero
-            dir += moveDir.X * right
-            dir += moveDir.Y * up
-            dir += moveDir.Z * forward
-            if dir.Magnitude > 0 then dir = dir.Unit end
-            bv.Velocity = dir * speed
-            bg.CFrame = CFrame.new(Vector3.zero, forward)
+    else
+        bv.Parent = nil
+        if flyTrack.IsPlaying then
+            flyTrack:Stop()
         end
-    end)
-
-    -- === Mobile GUI Buttons for Fly ===
-    local screenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-    screenGui.Name = "FlyTouchGUI"
-    screenGui.ResetOnSpawn = false
-
-    local function createButton(name, pos, size, text, callback)
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, size.X, 0, size.Y)
-        btn.Position = UDim2.new(0, pos.X, 0, pos.Y)
-        btn.Text = text
-        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        btn.TextColor3 = Color3.new(1, 1, 1)
-        btn.TextScaled = true
-        btn.Parent = screenGui
-        btn.AutoButtonColor = true
-        btn.Name = name
-        btn.MouseButton1Down:Connect(callback)
-        btn.MouseButton1Up:Connect(function()
-            if name ~= "Toggle" then moveDir = Vector3.zero end
-        end)
+        direction = Vector3.zero
     end
+end
 
-    createButton("Toggle", Vector2.new(20, 500), Vector2.new(100, 50), "Fly", function() setFly(not flying) end)
-    createButton("Up", Vector2.new(130, 430), Vector2.new(50, 50), "↑", function() moveDir = Vector3.new(0, 1, 0) end)
-    createButton("Down", Vector2.new(130, 500), Vector2.new(50, 50), "↓", function() moveDir = Vector3.new(0, -1, 0) end)
-    createButton("Forward", Vector2.new(190, 465), Vector2.new(50, 50), "→", function() moveDir = Vector3.new(0, 0, 1) end)
-    createButton("Back", Vector2.new(70, 465), Vector2.new(50, 50), "←", function() moveDir = Vector3.new(0, 0, -1) end)
+tabPlayer:CreateToggle({
+    Name = "Fly (Undetected + Animation)",
+    CurrentValue = false,
+    Callback = setFly
+})
+
+-- Input Keyboard (WASD, Space, Ctrl)
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    local v = Vector3.zero
+    local k = input.KeyCode
+    if k == Enum.KeyCode.W then v = Vector3.new(0, 0, -1)
+    elseif k == Enum.KeyCode.S then v = Vector3.new(0, 0, 1)
+    elseif k == Enum.KeyCode.A then v = Vector3.new(-1, 0, 0)
+    elseif k == Enum.KeyCode.D then v = Vector3.new(1, 0, 0)
+    elseif k == Enum.KeyCode.Space then v = Vector3.new(0, 1, 0)
+    elseif k == Enum.KeyCode.LeftControl then v = Vector3.new(0, -1, 0) end
+    direction += v
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    local v = Vector3.zero
+    local k = input.KeyCode
+    if k == Enum.KeyCode.W then v = Vector3.new(0, 0, -1)
+    elseif k == Enum.KeyCode.S then v = Vector3.new(0, 0, 1)
+    elseif k == Enum.KeyCode.A then v = Vector3.new(-1, 0, 0)
+    elseif k == Enum.KeyCode.D then v = Vector3.new(1, 0, 0)
+    elseif k == Enum.KeyCode.Space then v = Vector3.new(0, 1, 0)
+    elseif k == Enum.KeyCode.LeftControl then v = Vector3.new(0, -1, 0) end
+    direction -= v
+end)
+
+RunService.RenderStepped:Connect(function()
+    if flying and hrp and workspace.CurrentCamera then
+        local camCF = workspace.CurrentCamera.CFrame
+        local dir = camCF:VectorToWorldSpace(direction)
+        if dir.Magnitude > 0 then dir = dir.Unit end
+        bv.Velocity = dir * speed
+    end
 end)
