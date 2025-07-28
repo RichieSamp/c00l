@@ -1,0 +1,86 @@
+-- Paste source Criminality Lib di bagian atas (CriminalityLib table)
+
+local CriminalityLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/weakhoes/Roblox-UI-Libs/main/Criminality%20Lib/Criminality%20Lib%20Source.lua"))()
+
+-- Membuat window utama
+local window = CriminalityLib:CreateWindow({
+    Name = "Criminality GUI", 
+    Theme = "Default",
+})
+
+-- Tab “Main”
+local mainTab = window:CreateTab("Main")
+
+-- Subsection tombol biasa
+local section = mainTab:CreateSection("Actions")
+
+-- Toggle fly
+local flyEnabled = false
+section:CreateToggle({
+    Name = "Fly",
+    StartingState = false,
+    Callback = function(state)
+        flyEnabled = state
+        if state then
+            print("Fly diaktifkan")
+            -- Contoh implementasi fly
+            local lp = game.Players.LocalPlayer
+            if lp and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+                local hrp = lp.Character.HumanoidRootPart
+                -- Gunakan BodyVelocity atau metode lain
+                local bv = Instance.new("BodyVelocity", hrp)
+                bv.Velocity = Vector3.new(0, 50, 0)
+                bv.MaxForce = Vector3.new(0, math.huge, 0)
+                flyEnabled = true
+                spawn(function()
+                    while flyEnabled and bv.Parent do
+                        bv.Velocity = Vector3.new(0, 50, 0)
+                        wait(0.1)
+                    end
+                    bv:Destroy()
+                end)
+            end
+        else
+            print("Fly dimatikan")
+            flyEnabled = false
+        end
+    end,
+})
+
+-- Slider untuk kecepatan
+section:CreateSlider({
+    Name = "Speed",
+    Range = {16, 200},
+    StartingValue = 16,
+    Increment = 1,
+    Callback = function(val)
+        local lp = game.Players.LocalPlayer
+        if lp and lp.Character and lp.Character:FindFirstChild("Humanoid") then
+            lp.Character.Humanoid.WalkSpeed = val
+        end
+    end,
+})
+
+-- Contoh tombol sederhana
+section:CreateButton({
+    Name = "Rejoin Server",
+    Callback = function()
+        -- Rejoin: teleport ke game.PlaceId sendiri
+        local TeleportService = game:GetService("TeleportService")
+        TeleportService:Teleport(game.PlaceId, game.Players.LocalPlayer)
+    end,
+})
+
+-- Tab “Settings”
+local settingsTab = window:CreateTab("Settings")
+local settSection = settingsTab:CreateSection("Theme")
+settSection:CreateDropdown({
+    Name = "Pilih Tema",
+    Options = {"Default", "Dark", "Light"},
+    StartingOption = "Default",
+    Callback = function(option)
+        window:ChangeTheme(option)
+    end,
+})
+
+-- Akhir skrip
