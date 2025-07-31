@@ -1,8 +1,10 @@
+
 --// === Service Initialization ===
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -132,198 +134,81 @@ local function SendLog(ip, exec, blacklisted)
     })
 end
 
---// === Main Logic ===
-task.spawn(function()
-    local ip, exec = GetClient()
-    local username = LocalPlayer.Name
-    local isBlacklisted = BlockedUsers[username] or BlockedIPs[ip] or false
+-- Fly Feature with Noclip and Hover
+local Fly_Enabled = false
+local Fly_Speed = 60
+local BodyGyro, BodyVelocity, FlyConnection
+local character, humanoidRootPart
 
-    SendLog(ip, exec, isBlacklisted)
-
-    if isBlacklisted then
-        DisplayBlacklistUI()
-        return
-    end
-
-    --// === Username ESP ===
-    local UsernameESP_Enabled = false
-
-    local function RemoveUsernameESP(player)
-        if player.Character and player.Character:FindFirstChild("UsernameESP") then
-            player.Character:FindFirstChild("UsernameESP"):Destroy()
+local function EnableNoclip()
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
         end
     end
+end
 
-    local function AddUsernameESP(player)
-        if player == LocalPlayer then return end
+local function StartFly()
+    character = LocalPlayer.Character
+    if not character then return end
+    humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return end
 
-        local function Apply(character)
-            if not UsernameESP_Enabled then return end
-            local head = character:FindFirstChild("Head")
-            if head and not character:FindFirstChild("UsernameESP") then
-                local gui = Instance.new("BillboardGui")
-                gui.Name = "UsernameESP"
-                gui.Adornee = head
-                gui.AlwaysOnTop = true
-                gui.Size = UDim2.new(0, 60, 0, 16)
-                gui.StudsOffset = Vector3.new(0, 3, 0)
-                gui.Parent = character
+    EnableNoclip()
 
-                local label = Instance.new("TextLabel")
-                label.Text = player.Name
-                label.Font = Enum.Font.SourceSansBold
-                label.TextColor3 = Color3.new(1, 1, 1)
-                label.BackgroundTransparency = 1
-                label.TextScaled = true
-                label.Size = UDim2.new(1, 0, 1, 0)
-                label.Parent = gui
+    BodyGyro = Instance.new("BodyGyro")
+    BodyGyro.P = 9e4
+    BodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+    BodyGyro.CFrame = humanoidRootPart.CFrame
+    BodyGyro.Parent = humanoidRootPart
 
-                local stroke = Instance.new("UIStroke")
-                stroke.Thickness = 2.5
-                stroke.Color = Color3.new(0, 0, 0)
-                stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
-                stroke.Parent = label
-            end
-        end
+    BodyVelocity = Instance.new("BodyVelocity")
+    BodyVelocity.Velocity = Vector3.zero
+    BodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    BodyVelocity.Parent = humanoidRootPart
 
-        player.CharacterAdded:Connect(function(char)
-            char:WaitForChild("Head", 5)
-            task.wait(0.2)
-            Apply(char)
-        end)
+    FlyConnection = RunService.RenderStepped:Connect(function()
+        if not Fly_Enabled then return end
+        if not character or not humanoidRootPart then return end
 
-        if player.Character then Apply(player.Character) end
-    end
+        local cameraCF = workspace.CurrentCamera.CFrame
+        local moveVec = Vector3.zero
 
-    local function ToggleUsernameESP(state)
-        UsernameESP_Enabled = state
-        for _, p in ipairs(Players:GetPlayers()) do
-            if state then
-                AddUsernameESP(p)
-            else
-                RemoveUsernameESP(p)
-            end
-        end
-    end
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVec += cameraCF.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVec -= cameraCF.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVec -= cameraCF.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVec += cameraCF.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveVec += cameraCF.UpVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveVec -= cameraCF.UpVector end
 
-    Players.PlayerAdded:Connect(function(p)
-        if UsernameESP_Enabled then AddUsernameESP(p) end
+        BodyVelocity.Velocity = moveVec.Magnitude > 0 and moveVec.Unit * Fly_Speed or Vector3.zero
+        BodyGyro.CFrame = cameraCF
+
+        EnableNoclip()
     end)
+end
 
-    tabVisual:CreateToggle({
-        Name = "Username ESP",
-        CurrentValue = false,
-        Callback = ToggleUsernameESP,
-    })
+local function StopFly()
+    Fly_Enabled = false
+    if FlyConnection then FlyConnection:Disconnect() end
+    if BodyGyro then BodyGyro:Destroy() end
+    if BodyVelocity then BodyVelocity:Destroy() end
+end
 
-    --// === Box ESP ===
-    local BoxESP_Enabled = false
-    local Wireframes = {}
-    local Edges = {
-        {1, 2}, {2, 4}, {4, 3}, {3, 1},
-        {5, 6}, {6, 8}, {8, 7}, {7, 5},
-        {1, 5}, {2, 6}, {3, 7}, {4, 8}
-    }
-
-    local function ClearWireframe(player)
-        if Wireframes[player] then
-            for _, line in ipairs(Wireframes[player]) do
-                if line.Remove then line:Remove() end
-            end
-            Wireframes[player] = nil
-        end
+tabPlayer:CreateToggle({
+    Name = "Fly (Noclip + Hover)",
+    CurrentValue = false,
+    Callback = function(state)
+        Fly_Enabled = state
+        if state then StartFly() else StopFly() end
     end
+})
 
-    local function CreateWireframe(player)
-        if player == LocalPlayer or Wireframes[player] then return end
-        local lines = {}
-        for _ = 1, 12 do
-            local line = Drawing.new("Line")
-            line.Thickness = 1.5
-            line.Transparency = 1
-            line.Color = Color3.new(1, 1, 1)
-            line.Visible = false
-            table.insert(lines, line)
-        end
-        Wireframes[player] = lines
-    end
-
-    local function UpdateWireframes()
-        for player, lines in pairs(Wireframes) do
-            local char = player.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if not hrp or not hum or hum.Health <= 0 then
-                for _, line in ipairs(lines) do line.Visible = false end
-                continue
-            end
-
-            local min, max
-            for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    local pos = part.Position
-                    min = min and Vector3.new(math.min(min.X, pos.X), math.min(min.Y, pos.Y), math.min(min.Z, pos.Z)) or pos
-                    max = max and Vector3.new(math.max(max.X, pos.X), math.max(max.Y, pos.Y), math.max(max.Z, pos.Z)) or pos
-                end
-            end
-
-            if not min or not max then
-                for _, line in ipairs(lines) do line.Visible = false end
-                continue
-            end
-
-            min = min - Vector3.new(1.5, 1.5, 1.2)
-            max = max + Vector3.new(1.5, 1.5, 1.2)
-
-            local corners = {
-                Vector3.new(min.X, min.Y, min.Z), Vector3.new(max.X, min.Y, min.Z),
-                Vector3.new(min.X, min.Y, max.Z), Vector3.new(max.X, min.Y, max.Z),
-                Vector3.new(min.X, max.Y, min.Z), Vector3.new(max.X, max.Y, min.Z),
-                Vector3.new(min.X, max.Y, max.Z), Vector3.new(max.X, max.Y, max.Z)
-            }
-
-            local screen = {}
-            for i, v in ipairs(corners) do
-                local s, vis = Camera:WorldToViewportPoint(v)
-                screen[i] = vis and Vector2.new(s.X, s.Y) or nil
-            end
-
-            for i, edge in ipairs(Edges) do
-                local p1, p2 = screen[edge[1]], screen[edge[2]]
-                local line = lines[i]
-                if p1 and p2 then
-                    line.From = p1
-                    line.To = p2
-                    line.Visible = BoxESP_Enabled
-                else
-                    line.Visible = false
-                end
-            end
-        end
-    end
-
-    Players.PlayerAdded:Connect(CreateWireframe)
-    Players.PlayerRemoving:Connect(ClearWireframe)
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then CreateWireframe(p) end
-    end
-
-    RunService.RenderStepped:Connect(function()
-        if BoxESP_Enabled then UpdateWireframes() end
-    end)
-
-    tabVisual:CreateToggle({
-        Name = "Box ESP",
-        CurrentValue = false,
-        Callback = function(state)
-            BoxESP_Enabled = state
-            if not state then
-                for _, lines in pairs(Wireframes) do
-                    for _, line in ipairs(lines) do
-                        line.Visible = false
-                    end
-                end
-            end
-        end,
-    })
-end)
+tabPlayer:CreateSlider({
+    Name = "Fly Speed",
+    Range = {16, 200},
+    Increment = 1,
+    Suffix = " studs/s",
+    CurrentValue = Fly_Speed,
+    Callback = function(value) Fly_Speed = value end
+})
