@@ -27,7 +27,7 @@ local tabVehicle = MainUI:CreateTab("Vehicle", 4483362458)
 tabPlayer:CreateParagraph({Title = "Player", Content = "Movement tools available below"})
 tabVisual:CreateParagraph({Title = "Visual", Content = "ESP options below"})
 
---// === Fly (Noclip + Hover) ===
+--// === Fly (Mobile + PC support via MoveDirection) ===
 local Fly_Enabled = false
 local Fly_Speed = 60
 local BodyGyro, BodyVelocity, FlyConnection
@@ -51,7 +51,7 @@ local function StartFly()
 
     BodyGyro = Instance.new("BodyGyro")
     BodyGyro.P = 9e4
-    BodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+    BodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
     BodyGyro.CFrame = humanoidRootPart.CFrame
     BodyGyro.Parent = humanoidRootPart
 
@@ -62,19 +62,20 @@ local function StartFly()
 
     FlyConnection = RunService.RenderStepped:Connect(function()
         if not Fly_Enabled then return end
-        local moveVec = Vector3.zero
-        local camCF = Camera.CFrame
+        if not character or not humanoidRootPart then return end
 
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVec += camCF.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVec -= camCF.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVec -= camCF.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVec += camCF.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveVec += camCF.UpVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveVec -= camCF.UpVector end
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        local moveVec = humanoid and humanoid.MoveDirection or Vector3.zero
+        local camCF = workspace.CurrentCamera.CFrame
 
-        BodyVelocity.Velocity = moveVec.Magnitude > 0 and moveVec.Unit * Fly_Speed or Vector3.zero
+        if moveVec.Magnitude > 0 then
+            local moveWorld = camCF:VectorToWorldSpace(moveVec)
+            BodyVelocity.Velocity = moveWorld.Unit * Fly_Speed
+        else
+            BodyVelocity.Velocity = Vector3.zero
+        end
+
         BodyGyro.CFrame = camCF
-
         EnableNoclip()
     end)
 end
@@ -87,7 +88,7 @@ local function StopFly()
 end
 
 tabPlayer:CreateToggle({
-    Name = "Fly",
+    Name = "Fly (Mobile + PC)",
     CurrentValue = false,
     Callback = function(state)
         Fly_Enabled = state
@@ -101,7 +102,9 @@ tabPlayer:CreateSlider({
     Increment = 1,
     Suffix = " studs/s",
     CurrentValue = Fly_Speed,
-    Callback = function(value) Fly_Speed = value end
+    Callback = function(value)
+        Fly_Speed = value
+    end
 })
 
 --// === Username ESP (Stroke Tipis) ===
