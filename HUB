@@ -135,20 +135,20 @@ tabPlayer:CreateSlider({
     end
 })
 
---// === Teleport to Player ===
+--// === Teleport to Player (Instan, CFrame-based) ===
 local SelectedTarget = nil
 
+-- Dropdown: Daftar player selain LocalPlayer
 local function GetPlayerList()
-	local list = {}
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p ~= LocalPlayer then
-			table.insert(list, p.Name)
+	local names = {}
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer then
+			table.insert(names, plr.Name)
 		end
 	end
-	return list
+	return names
 end
 
--- Dropdown untuk memilih player
 local teleportDropdown = tabPlayer:CreateDropdown({
 	Name = "Select Player to Teleport",
 	Options = GetPlayerList(),
@@ -158,46 +158,67 @@ local teleportDropdown = tabPlayer:CreateDropdown({
 	end,
 })
 
--- Tombol refresh list player
+-- Refresh tombol
 tabPlayer:CreateButton({
 	Name = "Refresh Player List",
 	Callback = function()
 		teleportDropdown:SetOptions(GetPlayerList())
-	end,
+	end
 })
 
--- Tombol teleport ke target yang dipilih
+-- Tombol eksekusi teleport
 tabPlayer:CreateButton({
-	Name = "Teleport to Selected Player",
+	Name = "Teleport Instantly",
 	Callback = function()
+		local myChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		local myHRP = myChar:FindFirstChild("HumanoidRootPart")
+		if not myHRP then
+			Rayfield:Notify({
+				Title = "Teleport Failed",
+				Content = "Your HumanoidRootPart not found.",
+				Duration = 3
+			})
+			return
+		end
+
 		if not SelectedTarget then
 			Rayfield:Notify({
 				Title = "Teleport Failed",
-				Content = "No player selected.",
-				Duration = 3,
+				Content = "No target selected.",
+				Duration = 3
 			})
 			return
 		end
 
 		local target = Players:FindFirstChild(SelectedTarget)
-		if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-			local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-			if myHRP then
-				myHRP.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
-				Rayfield:Notify({
-					Title = "Teleported",
-					Content = "You teleported to " .. SelectedTarget,
-					Duration = 2,
-				})
-			end
-		else
+		if not target or not target.Character then
 			Rayfield:Notify({
 				Title = "Teleport Failed",
-				Content = "Target unavailable or missing HRP.",
-				Duration = 3,
+				Content = "Target player unavailable.",
+				Duration = 3
 			})
+			return
 		end
-	end,
+
+		local targetHRP = target.Character:FindFirstChild("HumanoidRootPart")
+		if not targetHRP then
+			Rayfield:Notify({
+				Title = "Teleport Failed",
+				Content = "Target missing HumanoidRootPart.",
+				Duration = 3
+			})
+			return
+		end
+
+		-- Teleport langsung via CFrame
+		myHRP.CFrame = targetHRP.CFrame + Vector3.new(0, 5, 0)
+
+		Rayfield:Notify({
+			Title = "Teleported",
+			Content = "Teleported to " .. SelectedTarget,
+			Duration = 2
+		})
+	end
 })
 
 --// === Username ESP (Stroke Tipis) ===
