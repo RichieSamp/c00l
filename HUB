@@ -65,17 +65,25 @@ local function StartFly()
         if not character or not humanoidRootPart then return end
 
         local humanoid = character:FindFirstChildOfClass("Humanoid")
-        local moveVec = humanoid and humanoid.MoveDirection or Vector3.zero
-        local camCF = workspace.CurrentCamera.CFrame
+        local input = humanoid and humanoid.MoveDirection or Vector3.zero
+
+        -- Tambahan naik/turun
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            input += Vector3.new(0, 1, 0)
+        elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            input -= Vector3.new(0, 1, 0)
+        end
+
+        -- Proyeksi input ke world space
+        local moveVec = workspace.CurrentCamera.CFrame:VectorToWorldSpace(input)
 
         if moveVec.Magnitude > 0 then
-            local moveWorld = camCF:VectorToWorldSpace(moveVec)
-            BodyVelocity.Velocity = moveWorld.Unit * Fly_Speed
+            BodyVelocity.Velocity = moveVec.Unit * Fly_Speed
         else
             BodyVelocity.Velocity = Vector3.zero
         end
 
-        BodyGyro.CFrame = camCF
+        BodyGyro.CFrame = workspace.CurrentCamera.CFrame
         EnableNoclip()
     end)
 end
@@ -196,28 +204,30 @@ local function UpdateBoxESP()
         local char = player.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         local hum = char and char:FindFirstChildOfClass("Humanoid")
+
         if not hrp or not hum or hum.Health <= 0 then
             box.Visible = false
             continue
         end
 
-        local min, max
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                local pos = part.Position
-                min = min and min:Min(pos) or pos
-                max = max and max:Max(pos) or pos
-            end
-        end
+        -- Estimasi tinggi dan lebar dari karakter
+        local height = 5
+        local width = 2.5
 
-        if not min or not max then box.Visible = false continue end
+        local topWorld = hrp.Position + Vector3.new(0, height / 2, 0)
+        local bottomWorld = hrp.Position - Vector3.new(0, height / 2, 0)
+        local leftOffset = workspace.CurrentCamera.CFrame.RightVector * -width / 2
+        local rightOffset = workspace.CurrentCamera.CFrame.RightVector * width / 2
 
-        local tl, vis1 = Camera:WorldToViewportPoint(Vector3.new(min.X, max.Y, min.Z))
-        local br, vis2 = Camera:WorldToViewportPoint(Vector3.new(max.X, min.Y, max.Z))
+        local topLeft3D = topWorld + leftOffset
+        local bottomRight3D = bottomWorld + rightOffset
+
+        local topLeft2D, vis1 = Camera:WorldToViewportPoint(topLeft3D)
+        local bottomRight2D, vis2 = Camera:WorldToViewportPoint(bottomRight3D)
 
         if vis1 and vis2 then
-            box.Position = Vector2.new(tl.X, tl.Y)
-            box.Size = Vector2.new(br.X - tl.X, br.Y - tl.Y)
+            box.Position = Vector2.new(topLeft2D.X, topLeft2D.Y)
+            box.Size = Vector2.new(bottomRight2D.X - topLeft2D.X, bottomRight2D.Y - topLeft2D.Y)
             box.Visible = BoxESP_Enabled
         else
             box.Visible = false
