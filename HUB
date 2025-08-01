@@ -27,18 +27,41 @@ local tabVehicle = MainUI:CreateTab("Vehicle", 4483362458)
 tabPlayer:CreateParagraph({Title = "Player", Content = "Movement tools available below"})
 tabVisual:CreateParagraph({Title = "Visual", Content = "ESP options below"})
 
---// === Fly (Mobile + PC support via MoveDirection) ===
+--// === Fly ===
 local Fly_Enabled = false
 local Fly_Speed = 60
 local BodyGyro, BodyVelocity, FlyConnection
 local character, humanoidRootPart
+local noclippedParts = {}
 
 local function EnableNoclip()
+    table.clear(noclippedParts)
     for _, part in ipairs(character:GetDescendants()) do
-        if part:IsA("BasePart") then
+        if part:IsA("BasePart") and part.CanCollide then
+            noclippedParts[part] = true
             part.CanCollide = false
         end
     end
+end
+
+local function RestoreCollision()
+    for part in pairs(noclippedParts) do
+        if part and part:IsA("BasePart") then
+            part.CanCollide = true
+        end
+    end
+    table.clear(noclippedParts)
+end
+
+local function GetInputDirection()
+    local direction = Vector3.zero
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then direction += Vector3.new(0, 0, -1) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then direction += Vector3.new(0, 0, 1) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then direction += Vector3.new(-1, 0, 0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then direction += Vector3.new(1, 0, 0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction += Vector3.new(0, 1, 0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then direction += Vector3.new(0, -1, 0) end
+    return direction
 end
 
 local function StartFly()
@@ -62,28 +85,24 @@ local function StartFly()
 
     FlyConnection = RunService.RenderStepped:Connect(function()
         if not Fly_Enabled then return end
-        if not character or not humanoidRootPart then return end
 
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        local input = humanoid and humanoid.MoveDirection or Vector3.zero
+        local cameraCF = Camera.CFrame
+        local moveVec = GetInputDirection()
 
-        -- Tambahan naik/turun
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            input += Vector3.new(0, 1, 0)
-        elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-            input -= Vector3.new(0, 1, 0)
+        -- Fallback untuk mobile jika tidak ada input WASD
+        if moveVec.Magnitude == 0 then
+            local hum = character:FindFirstChildOfClass("Humanoid")
+            moveVec = hum and hum.MoveDirection or Vector3.zero
         end
 
-        -- Proyeksi input ke world space
-        local moveVec = workspace.CurrentCamera.CFrame:VectorToWorldSpace(input)
-
         if moveVec.Magnitude > 0 then
-            BodyVelocity.Velocity = moveVec.Unit * Fly_Speed
+            local worldVec = cameraCF:VectorToWorldSpace(moveVec)
+            BodyVelocity.Velocity = worldVec.Unit * Fly_Speed
         else
             BodyVelocity.Velocity = Vector3.zero
         end
 
-        BodyGyro.CFrame = workspace.CurrentCamera.CFrame
+        BodyGyro.CFrame = cameraCF
         EnableNoclip()
     end)
 end
@@ -93,10 +112,11 @@ local function StopFly()
     if FlyConnection then FlyConnection:Disconnect() end
     if BodyGyro then BodyGyro:Destroy() end
     if BodyVelocity then BodyVelocity:Destroy() end
+    RestoreCollision()
 end
 
 tabPlayer:CreateToggle({
-    Name = "Fly (Mobile + PC)",
+    Name = "Fly",
     CurrentValue = false,
     Callback = function(state)
         Fly_Enabled = state
