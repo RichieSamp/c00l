@@ -135,6 +135,36 @@ tabPlayer:CreateSlider({
     end
 })
 
+--// === Teleport to Player ===
+local SelectedTarget = nil
+
+-- Dropdown player list
+local function UpdatePlayerList()
+    local names = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(names, p.Name)
+        end
+    end
+    return names
+end
+
+tabPlayer:CreateDropdown({
+    Name = "Select Player to Teleport",
+    Options = UpdatePlayerList(),
+    CurrentOption = "",
+    Flag = "TeleportTargetPlayer",
+    Callback = function(option)
+        SelectedTarget = option
+    end,
+})
+
+-- Tombol untuk teleport
+tabPlayer:CreateButton({
+    Name = "Teleport to Selected Player",
+    Callback = function()
+        if not SelectedTarget
+
 --// === Username ESP (Stroke Tipis) ===
 local UsernameESP_Enabled = false
 local function RemoveUsernameESP(player)
