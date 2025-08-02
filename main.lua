@@ -1,86 +1,171 @@
--- Load Obsidian UI Library
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"))()
-local Window = Library:Window("Swift UI", "Fly + NoClip", Color3.fromRGB(44, 120, 224), Enum.KeyCode.RightControl)
-local MainTab = Window:Tab("Main")
-
--- Services
-local userinput = game:GetService("UserInputService")
+--=== Services ===--
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local Camera = Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
--- Fly variables
-local flying = false
-local flySpeed = 50
+--=== Executor + Rayfield UI ===--
+local Executor = identifyexecutor and identifyexecutor() or "Unknown"
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+local MainUI = Rayfield:CreateWindow({
+	Name = "Learzy Hub | " .. Executor,
+	Theme = "Amethyst",
+	ToggleUIKeybind = "K",
+})
 
--- Fly Function
-local function toggleFly(state)
-    local player = game.Players.LocalPlayer
-    local character = player.Character or player.CharacterAdded:Wait()
-    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+--=== Tabs ===--
+local tabPlayer = MainUI:CreateTab("Player", 4483362458)
+local tabVisual = MainUI:CreateTab("Visual", 4483362458)
 
-    if state then
-        flying = true
+--=== Fly Script ===--
+local Fly_Enabled = false
+local Fly_Speed = 60
+local BodyGyro, BodyVelocity, FlyConnection
+local character, humanoidRootPart
+local noclippedParts = {}
 
-        local bodyGyro = Instance.new("BodyGyro", humanoidRootPart)
-        bodyGyro.P = 9e4
-        bodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
-        bodyGyro.cframe = humanoidRootPart.CFrame
-
-        local bodyVelocity = Instance.new("BodyVelocity", humanoidRootPart)
-        bodyVelocity.velocity = Vector3.new(0, 0, 0)
-        bodyVelocity.maxForce = Vector3.new(9e9, 9e9, 9e9)
-
-        -- NoClip + Fly Movement Loop
-        coroutine.wrap(function()
-            while flying and character and character:FindFirstChild("HumanoidRootPart") do
-                local cam = workspace.CurrentCamera
-                local moveDirection = Vector3.zero
-
-                -- Handle WASD + Space + Ctrl
-                if userinput:IsKeyDown(Enum.KeyCode.W) then moveDirection += cam.CFrame.LookVector end
-                if userinput:IsKeyDown(Enum.KeyCode.S) then moveDirection -= cam.CFrame.LookVector end
-                if userinput:IsKeyDown(Enum.KeyCode.A) then moveDirection -= cam.CFrame.RightVector end
-                if userinput:IsKeyDown(Enum.KeyCode.D) then moveDirection += cam.CFrame.RightVector end
-                if userinput:IsKeyDown(Enum.KeyCode.Space) then moveDirection += cam.CFrame.UpVector end
-                if userinput:IsKeyDown(Enum.KeyCode.LeftControl) then moveDirection -= cam.CFrame.UpVector end
-
-                -- Apply movement
-                bodyVelocity.Velocity = moveDirection.Unit * flySpeed
-                bodyGyro.CFrame = cam.CFrame
-
-                -- NoClip (disable collisions)
-                for _, part in ipairs(character:GetDescendants()) do
-                    if part:IsA("BasePart") and part.CanCollide == true then
-                        part.CanCollide = false
-                    end
-                end
-
-                task.wait()
-            end
-
-            -- Cleanup: Remove fly + restore collisions
-            for _, obj in pairs(humanoidRootPart:GetChildren()) do
-                if obj:IsA("BodyGyro") or obj:IsA("BodyVelocity") then
-                    obj:Destroy()
-                end
-            end
-            -- Restore collision
-            for _, part in ipairs(character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = true
-                end
-            end
-        end)()
-    else
-        flying = false
-    end
+local function EnableNoclip()
+	table.clear(noclippedParts)
+	for _, part in ipairs(character:GetDescendants()) do
+		if part:IsA("BasePart") and part.CanCollide then
+			noclippedParts[part] = true
+			part.CanCollide = false
+		end
+	end
 end
 
--- UI: Toggle Fly
-MainTab:Toggle("Fly Mode", false, function(state)
-    toggleFly(state)
-end)
+local function RestoreCollision()
+	for part in pairs(noclippedParts) do
+		if part and part:IsA("BasePart") then
+			part.CanCollide = true
+		end
+	end
+	table.clear(noclippedParts)
+end
 
--- UI: Slider Speed
-MainTab:Slider("Fly Speed", 10, 200, 50, function(value)
-    flySpeed = value
-end)
+local function GetInputDirection()
+	local direction = Vector3.zero
+	if UserInputService:IsKeyDown(Enum.KeyCode.W) then direction += Vector3.new(0, 0, -1) end
+	if UserInputService:IsKeyDown(Enum.KeyCode.S) then direction += Vector3.new(0, 0, 1) end
+	if UserInputService:IsKeyDown(Enum.KeyCode.A) then direction += Vector3.new(-1, 0, 0) end
+	if UserInputService:IsKeyDown(Enum.KeyCode.D) then direction += Vector3.new(1, 0, 0) end
+	if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction += Vector3.new(0, 1, 0) end
+	if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then direction += Vector3.new(0, -1, 0) end
+	return direction
+end
+
+local function StartFly()
+	character = LocalPlayer.Character
+	if not character then return end
+	humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+	if not humanoidRootPart then return end
+
+	EnableNoclip()
+
+	BodyGyro = Instance.new("BodyGyro")
+	BodyGyro.P = 9e4
+	BodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+	BodyGyro.CFrame = humanoidRootPart.CFrame
+	BodyGyro.Parent = humanoidRootPart
+
+	BodyVelocity = Instance.new("BodyVelocity")
+	BodyVelocity.Velocity = Vector3.zero
+	BodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+	BodyVelocity.Parent = humanoidRootPart
+
+	FlyConnection = RunService.RenderStepped:Connect(function()
+		if not Fly_Enabled then return end
+		local cameraCF = Camera.CFrame
+		local moveVec = GetInputDirection()
+		if moveVec.Magnitude == 0 then
+			local hum = character:FindFirstChildOfClass("Humanoid")
+			moveVec = hum and hum.MoveDirection or Vector3.zero
+		end
+		BodyVelocity.Velocity = moveVec.Magnitude > 0 and cameraCF:VectorToWorldSpace(moveVec).Unit * Fly_Speed or Vector3.zero
+		BodyGyro.CFrame = cameraCF
+		EnableNoclip()
+	end)
+end
+
+local function StopFly()
+	Fly_Enabled = false
+	if FlyConnection then FlyConnection:Disconnect() end
+	if BodyGyro then BodyGyro:Destroy() end
+	if BodyVelocity then BodyVelocity:Destroy() end
+	RestoreCollision()
+end
+
+tabPlayer:CreateToggle({
+	Name = "Fly",
+	CurrentValue = false,
+	Callback = function(state)
+		Fly_Enabled = state
+		if state then StartFly() else StopFly() end
+	end
+})
+
+tabPlayer:CreateSlider({
+	Name = "Fly Speed",
+	Range = {16, 200},
+	Increment = 1,
+	Suffix = " studs/s",
+	CurrentValue = Fly_Speed,
+	Callback = function(value)
+		Fly_Speed = value
+	end
+})
+
+--=== ESP Integration ===--
+local ESP = loadstring(game:HttpGet("https://raw.githubusercontent.com/RichieSamp/c00l/main/ESP.lua"))()
+ESP:Init()
+
+--=== ESP Toggles ===--
+tabVisual:CreateColorPicker({
+	Name = "ESP Color",
+	Color = Color3.fromRGB(255, 255, 255),
+	Callback = function(color)
+		ESP:UpdateConfig({ Color = color })
+	end
+})
+
+tabVisual:CreateToggle({
+	Name = "Username ESP",
+	CurrentValue = false,
+	Callback = function(state)
+		ESP:UpdateConfig({ Username = state })
+	end
+})
+
+tabVisual:CreateToggle({
+	Name = "Box ESP",
+	CurrentValue = false,
+	Callback = function(state)
+		ESP:UpdateConfig({ Box = state })
+	end
+})
+
+tabVisual:CreateToggle({
+	Name = "Chams (Highlight)",
+	CurrentValue = false,
+	Callback = function(state)
+		ESP:UpdateConfig({ Chams = state })
+	end
+})
+
+tabVisual:CreateToggle({
+	Name = "Health Bar ESP",
+	CurrentValue = false,
+	Callback = function(state)
+		ESP:UpdateConfig({ HealthBar = state })
+	end
+})
+
+tabVisual:CreateToggle({
+	Name = "Distance ESP",
+	CurrentValue = false,
+	Callback = function(state)
+		ESP:UpdateConfig({ Distance = state })
+	end
+})
