@@ -4,9 +4,6 @@ local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local VirtualUser = game:GetService("VirtualUser")
-local Workspace = game:GetService("Workspace")
-local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -26,23 +23,9 @@ local tabPlayer = MainUI:CreateTab("Player", 4483362458)
 local tabVisual = MainUI:CreateTab("Visual", 4483362458)
 local tabCombat = MainUI:CreateTab("Combat", 4483362458)
 local tabVehicle = MainUI:CreateTab("Vehicle", 4483362458)
-local tabObby = MainUI:CreateTab("Obby", 4483362458)
 
 tabPlayer:CreateParagraph({Title = "Player", Content = "Movement tools available below"})
 tabVisual:CreateParagraph({Title = "Visual", Content = "ESP options below"})
-
---// === Obby State & Toggle ===
-local Obby_Enabled = false
-tabObby:CreateToggle({
-    Name = "Enable Obby Auto-Farm + Rebirth",
-    CurrentValue = false,
-    Callback = function(state)
-        Obby_Enabled = state
-        if state then
-            startObby()
-        end
-    end
-})
 
 --// === Fly ===
 local Fly_Enabled = false
@@ -102,18 +85,23 @@ local function StartFly()
 
     FlyConnection = RunService.RenderStepped:Connect(function()
         if not Fly_Enabled then return end
+
         local cameraCF = Camera.CFrame
         local moveVec = GetInputDirection()
+
+        -- Fallback untuk mobile jika tidak ada input WASD
         if moveVec.Magnitude == 0 then
             local hum = character:FindFirstChildOfClass("Humanoid")
             moveVec = hum and hum.MoveDirection or Vector3.zero
         end
+
         if moveVec.Magnitude > 0 then
             local worldVec = cameraCF:VectorToWorldSpace(moveVec)
             BodyVelocity.Velocity = worldVec.Unit * Fly_Speed
         else
             BodyVelocity.Velocity = Vector3.zero
         end
+
         BodyGyro.CFrame = cameraCF
         EnableNoclip()
     end)
@@ -147,143 +135,143 @@ tabPlayer:CreateSlider({
     end
 })
 
--- === Obby System ===
-local function Notify(title, text, duration)
-    StarterGui:SetCore("SendNotification", {
-        Title = title,
-        Text = text,
-        Duration = duration or 5,
-    })
+--// === Username ESP (Stroke Tipis) ===
+local UsernameESP_Enabled = false
+local function RemoveUsernameESP(player)
+    if player.Character and player.Character:FindFirstChild("UsernameESP") then
+        player.Character:FindFirstChild("UsernameESP"):Destroy()
+    end
 end
 
-local function enableGodMode(hum)
-    hum.Health = hum.MaxHealth
-    hum:GetPropertyChangedSignal("Health"):Connect(function()
-        if hum.Health < hum.MaxHealth then
-            hum.Health = hum.MaxHealth
-        end
-    end)
-    hum.BreakJointsOnDeath = false
-end
+local function AddUsernameESP(player)
+    if player == LocalPlayer then return end
+    local function Apply(character)
+        if not UsernameESP_Enabled then return end
+        local head = character:FindFirstChild("Head")
+        if head and not character:FindFirstChild("UsernameESP") then
+            local gui = Instance.new("BillboardGui")
+            gui.Name = "UsernameESP"
+            gui.Adornee = head
+            gui.AlwaysOnTop = true
+            gui.Size = UDim2.new(0, 100, 0, 20)
+            gui.StudsOffset = Vector3.new(0, 3, 0)
+            gui.Parent = character
 
-local function getCurrentStage()
-    local stats = LocalPlayer:FindFirstChild("leaderstats")
-    if stats then
-        local stageVal = stats:FindFirstChild("Stage") or stats:FindFirstChild("Level")
-        if stageVal and stageVal:IsA("IntValue") then
-            return stageVal.Value + 1
+            local label = Instance.new("TextLabel")
+            label.Text = player.Name
+            label.Font = Enum.Font.SourceSans
+            label.TextColor3 = Color3.new(1, 1, 1)
+            label.BackgroundTransparency = 1
+            label.TextScaled = true
+            label.Size = UDim2.new(1, 0, 1, 0)
+            label.Parent = gui
+
+            local stroke = Instance.new("UIStroke")
+            stroke.Thickness = 0.75
+            stroke.Color = Color3.new(0, 0, 0)
+            stroke.Parent = label
         end
     end
-    return 1
-end
-
-local function getLimitedPath(hrp)
-    local checkpoints = {}
-    for _, part in ipairs(workspace:GetDescendants()) do
-        if part:IsA("Part") then
-            local stageNum = tonumber(part.Name:match("%d+"))
-            if stageNum and stageNum >= getCurrentStage() and stageNum <= getCurrentStage() + 4 then
-                table.insert(checkpoints, {
-                    part = part,
-                    stage = stageNum,
-                    dist = (hrp.Position - part.Position).Magnitude
-                })
-            end
-        end
-    end
-    local closest = {}
-    for _, data in ipairs(checkpoints) do
-        if not closest[data.stage] or data.dist < closest[data.stage].dist then
-            closest[data.stage] = data
-        end
-    end
-    local path = {}
-    for _, v in pairs(closest) do table.insert(path, v) end
-    table.sort(path, function(a, b) return a.stage < b.stage end)
-    return path
-end
-
-local function tweenPath(hrp, path)
-    for _, node in ipairs(path) do
-        local part = node.part
-        if not part then continue end
-        local targetPos = part.Position + Vector3.new(0, 3, 0)
-        local dist = (hrp.Position - targetPos).Magnitude
-        local tween = game:GetService("TweenService"):Create(hrp, TweenInfo.new(dist / 40, Enum.EasingStyle.Linear), {CFrame = CFrame.new(targetPos)})
-        tween:Play()
-        local completed = false
-        tween.Completed:Connect(function() completed = true end)
-        local timeout = tick() + 5
-        while not completed and tick() < timeout do task.wait(0.05) end
-        hrp.CFrame = CFrame.new(targetPos)
-        firetouchinterest(hrp, part, 0)
-        task.wait(0.1)
-        firetouchinterest(hrp, part, 1)
-        local waitTO = tick() + 5
-        while getCurrentStage() <= node.stage and tick() < waitTO do task.wait(0.1) end
+    player.CharacterAdded:Connect(function(char)
+        char:WaitForChild("Head", 5)
         task.wait(0.2)
+        Apply(char)
+    end)
+    if player.Character then Apply(player.Character) end
+end
+
+local function ToggleUsernameESP(state)
+    UsernameESP_Enabled = state
+    for _, p in ipairs(Players:GetPlayers()) do
+        if state then AddUsernameESP(p) else RemoveUsernameESP(p) end
     end
 end
 
-local rebirthPending = false
-local function tryRebirth(hrp)
-    if rebirthPending then return end
-    if getCurrentStage() - 1 <= 0 then
-        rebirthPending = true
-        Notify("🎉 Rebirth Triggered!", "Stage 0 reached — rebirthing...", 5)
-        local remote = game:GetService("ReplicatedStorage"):WaitForChild("MainRemote")
-        pcall(function()
-            remote:FireServer({Request = "SetStage", Stage = 251})
-            task.wait(0.3)
-            remote:FireServer({Request = "StageHop", Delta = 10})
-            task.wait(0.3)
-            remote:FireServer({Request = "Purchase", Type = "RebirthProduct"})
-        end)
-        task.delay(8, function()
-            rebirthPending = false
-            if Obby_Enabled then
-                startObby()
-            end
-        end)
+Players.PlayerAdded:Connect(function(p)
+    if UsernameESP_Enabled then AddUsernameESP(p) end
+end)
+
+tabVisual:CreateToggle({
+    Name = "Username ESP",
+    CurrentValue = false,
+    Callback = ToggleUsernameESP,
+})
+
+--// === 2D Box ESP ===
+local BoxESP_Enabled = false
+local BoxDrawings = {}
+
+local function RemoveBoxESP(player)
+    if BoxDrawings[player] then
+        BoxDrawings[player]:Remove()
+        BoxDrawings[player] = nil
     end
 end
 
-local stageGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
-local label = Instance.new("TextLabel", stageGui)
-label.Size = UDim2.new(0, 300, 0, 30)
-label.Position = UDim2.new(0, 20, 0, 40)
-label.BackgroundTransparency = 0.3
-label.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-label.TextColor3 = Color3.fromRGB(255, 255, 255)
-label.Font = Enum.Font.SourceSansBold
-label.TextSize = 20
-label.TextXAlignment = Enum.TextXAlignment.Left
-
-function startObby()
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp = char:WaitForChild("HumanoidRootPart")
-    local hum = char:WaitForChild("Humanoid")
-    enableGodMode(hum)
-
-    task.spawn(function()
-        while Obby_Enabled do
-            local path = getLimitedPath(hrp)
-            if #path == 0 then
-                Notify("⚠️ No Checkpoint", "No path found. Halting.", 5)
-                break
-            end
-            tweenPath(hrp, path)
-            tryRebirth(hrp)
-            task.wait(0.2)
-        end
-    end)
-
-    task.spawn(function()
-        while Obby_Enabled do
-            local stage = getCurrentStage() - 1
-            label.Text = "Stage Sekarang: " .. stage .. " | Selanjutnya: " .. (stage + 1)
-            task.wait(0.3)
-        end
-        label.Text = ""
-    end)
+local function CreateBoxESP(player)
+    if player == LocalPlayer or BoxDrawings[player] then return end
+    local box = Drawing.new("Square")
+    box.Thickness = 1
+    box.Color = Color3.new(1, 1, 1)
+    box.Transparency = 1
+    box.Filled = false
+    box.Visible = false
+    BoxDrawings[player] = box
 end
+
+local function UpdateBoxESP()
+    for player, box in pairs(BoxDrawings) do
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+        if not hrp or not hum or hum.Health <= 0 then
+            box.Visible = false
+            continue
+        end
+
+        -- Estimasi tinggi dan lebar dari karakter
+        local height = 5
+        local width = 2.5
+
+        local topWorld = hrp.Position + Vector3.new(0, height / 2, 0)
+        local bottomWorld = hrp.Position - Vector3.new(0, height / 2, 0)
+        local leftOffset = workspace.CurrentCamera.CFrame.RightVector * -width / 2
+        local rightOffset = workspace.CurrentCamera.CFrame.RightVector * width / 2
+
+        local topLeft3D = topWorld + leftOffset
+        local bottomRight3D = bottomWorld + rightOffset
+
+        local topLeft2D, vis1 = Camera:WorldToViewportPoint(topLeft3D)
+        local bottomRight2D, vis2 = Camera:WorldToViewportPoint(bottomRight3D)
+
+        if vis1 and vis2 then
+            box.Position = Vector2.new(topLeft2D.X, topLeft2D.Y)
+            box.Size = Vector2.new(bottomRight2D.X - topLeft2D.X, bottomRight2D.Y - topLeft2D.Y)
+            box.Visible = BoxESP_Enabled
+        else
+            box.Visible = false
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(CreateBoxESP)
+Players.PlayerRemoving:Connect(RemoveBoxESP)
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then CreateBoxESP(p) end
+end
+
+RunService.RenderStepped:Connect(function()
+    if BoxESP_Enabled then UpdateBoxESP() end
+end)
+
+tabVisual:CreateToggle({
+    Name = "Box ESP",
+    CurrentValue = false,
+    Callback = function(state)
+        BoxESP_Enabled = state
+        if not state then
+            for _, box in pairs(BoxDrawings) do box.Visible = false end
+        end
+    end
+})
