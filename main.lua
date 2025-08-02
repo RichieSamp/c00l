@@ -5,16 +5,16 @@ local UserInputService = game:GetService("UserInputService")
 local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- UI Lib dari GitHub
-local Library = loadstring(game:HttpGet("https://github.com/weakhoes/Roblox-UI-Libs/blob/main/Criminality%20Lib/Criminality%20Lib%20Source.lua"))()
+-- Load UI Library dari GitHub
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/weakhoes/Roblox-UI-Libs/main/Criminality%20Lib/Criminality%20Lib%20Source.lua"))()
 local Window = Library:CreateWindow("Learzy Hub", Vector2.new(500, 550), Enum.KeyCode.K)
 local Tab1 = Window:CreateTab("Player")
 local Tab2 = Window:CreateTab("Visual")
 
--- ESP setup
+-- ESP config
 local ESP = {
 	Drawings = {},
-	Color = Color3.new(1, 1, 1),
+	Color = Color3.fromRGB(255, 255, 255),
 	UsernameESP = false,
 	BoxESP = false,
 	ChamsESP = false,
@@ -22,6 +22,7 @@ local ESP = {
 	DistanceESP = false
 }
 
+-- Clear ESP
 local function clearESP(p)
 	if ESP.Drawings[p] then
 		for _, v in pairs(ESP.Drawings[p]) do
@@ -33,6 +34,7 @@ local function clearESP(p)
 	end
 end
 
+-- Apply ESP
 local function applyESP(p)
 	if p == LocalPlayer then return end
 	clearESP(p)
@@ -55,11 +57,11 @@ local function applyESP(p)
 			label.Text = p.Name
 			label.TextColor3 = ESP.Color
 			label.BackgroundTransparency = 1
-			label.Size = UDim2.fromScale(1,1)
+			label.Size = UDim2.fromScale(1, 1)
 			label.TextScaled = true
 			local stroke = Instance.new("UIStroke", label)
 			stroke.Thickness = 1
-			stroke.Color = Color3.new(0,0,0)
+			stroke.Color = Color3.new(0, 0, 0)
 			ESP.Drawings[p].Name = gui
 		end
 
@@ -67,7 +69,7 @@ local function applyESP(p)
 			local h = Instance.new("Highlight")
 			h.Adornee = char
 			h.FillColor = ESP.Color
-			h.OutlineColor = Color3.new(0,0,0)
+			h.OutlineColor = Color3.new(0, 0, 0)
 			h.FillTransparency = 0.6
 			h.OutlineTransparency = 0.3
 			h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
@@ -77,6 +79,7 @@ local function applyESP(p)
 	end)
 end
 
+-- ESP update loop
 function ESP:Init()
 	for _, p in ipairs(Players:GetPlayers()) do applyESP(p) end
 	Players.PlayerAdded:Connect(applyESP)
@@ -93,6 +96,7 @@ function ESP:Init()
 				continue
 			end
 			local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
 			if ESP.BoxESP then
 				if not tbl.Box then
 					local box = Drawing.new("Square")
@@ -103,14 +107,14 @@ function ESP:Init()
 					tbl.Box = box
 				end
 				local sizeY, sizeX = 5, 2.5
-				local top = hrp.Position + Vector3.new(0, sizeY/2, 0)
-				local bottom = hrp.Position - Vector3.new(0, sizeY/2, 0)
+				local top = hrp.Position + Vector3.new(0, sizeY / 2, 0)
+				local bottom = hrp.Position - Vector3.new(0, sizeY / 2, 0)
 				local p1 = Camera:WorldToViewportPoint(top)
 				local p2 = Camera:WorldToViewportPoint(bottom)
-				local x = (p1.X + p2.X)/2 - sizeX*5
-				local y = (p1.Y + p2.Y)/2 - sizeY*5
-				tbl.Box.Position = Vector2.new(x,y)
-				tbl.Box.Size = Vector2.new(sizeX*10,sizeY*10)
+				local x = (p1.X + p2.X) / 2 - sizeX * 5
+				local y = (p1.Y + p2.Y) / 2 - sizeY * 5
+				tbl.Box.Position = Vector2.new(x, y)
+				tbl.Box.Size = Vector2.new(sizeX * 10, sizeY * 10)
 				tbl.Box.Color = ESP.Color
 				tbl.Box.Visible = onScreen
 			elseif tbl.Box then
@@ -127,7 +131,7 @@ function ESP:Init()
 					tbl.Distance = txt
 				end
 				local dist = math.floor((LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and (LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude) or 0)
-				tbl.Distance.Text = dist.."m"
+				tbl.Distance.Text = dist .. "m"
 				tbl.Distance.Position = Vector2.new(screenPos.X, screenPos.Y - 30)
 				tbl.Distance.Color = ESP.Color
 				tbl.Distance.Visible = onScreen
@@ -143,7 +147,7 @@ function ESP:Init()
 					local outline = Drawing.new("Square")
 					outline.Filled = false
 					outline.Thickness = 1
-					outline.Color = Color3.new(0,0,0)
+					outline.Color = Color3.new(0, 0, 0)
 					tbl.HealthBar = bar
 					tbl.HealthOutline = outline
 				end
@@ -151,7 +155,7 @@ function ESP:Init()
 				local h = 50
 				tbl.HealthBar.Size = Vector2.new(4, h * pct)
 				tbl.HealthBar.Position = Vector2.new(screenPos.X - 45, screenPos.Y + 25 - h * pct)
-				tbl.HealthBar.Color = Color3.fromRGB(255,0,0):Lerp(Color3.fromRGB(0,255,0), pct)
+				tbl.HealthBar.Color = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(0, 255, 0), pct)
 				tbl.HealthBar.Visible = onScreen
 				tbl.HealthOutline.Size = Vector2.new(4, h)
 				tbl.HealthOutline.Position = Vector2.new(screenPos.X - 45, screenPos.Y + 25 - h)
@@ -236,16 +240,14 @@ function Fly:Toggle(state)
 	end
 end
 
--- UI Integration
+-- UI Binding
 Tab1:CreateToggle("Fly", function(state) Fly:Toggle(state) end)
 Tab1:CreateSlider("Fly Speed", 16, 200, function(val) Fly:SetSpeed(val) end, 60)
 
 Tab2:CreateToggle("Username ESP", function(state) ESP.UsernameESP = state end)
 Tab2:CreateToggle("Box ESP", function(state) ESP.BoxESP = state end)
-Tab2:CreateToggle("Chams (Highlight)", function(state) ESP.ChamsESP = state end)
-Tab2:CreateToggle("Health Bar ESP", function(state) ESP.HealthESP = state end)
+Tab2:CreateToggle("Chams", function(state) ESP.ChamsESP = state end)
+Tab2:CreateToggle("Health ESP", function(state) ESP.HealthESP = state end)
 Tab2:CreateToggle("Distance ESP", function(state) ESP.DistanceESP = state end)
 
 ESP:Init()
-
-
