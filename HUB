@@ -31,6 +31,19 @@ local tabObby = MainUI:CreateTab("Obby", 4483362458)
 tabPlayer:CreateParagraph({Title = "Player", Content = "Movement tools available below"})
 tabVisual:CreateParagraph({Title = "Visual", Content = "ESP options below"})
 
+--// === Obby State & Toggle ===
+local Obby_Enabled = false
+tabObby:CreateToggle({
+    Name = "Enable Obby Auto-Farm + Rebirth",
+    CurrentValue = false,
+    Callback = function(state)
+        Obby_Enabled = state
+        if state then
+            startObby()
+        end
+    end
+})
+
 --// === Fly ===
 local Fly_Enabled = false
 local Fly_Speed = 60
@@ -134,155 +147,7 @@ tabPlayer:CreateSlider({
     end
 })
 
---// === Username ESP ===
-local UsernameESP_Enabled = false
-local function RemoveUsernameESP(player)
-    if player.Character and player.Character:FindFirstChild("UsernameESP") then
-        player.Character:FindFirstChild("UsernameESP"):Destroy()
-    end
-end
-
-local function AddUsernameESP(player)
-    if player == LocalPlayer then return end
-    local function Apply(character)
-        if not UsernameESP_Enabled then return end
-        local head = character:FindFirstChild("Head")
-        if head and not character:FindFirstChild("UsernameESP") then
-            local gui = Instance.new("BillboardGui")
-            gui.Name = "UsernameESP"
-            gui.Adornee = head
-            gui.AlwaysOnTop = true
-            gui.Size = UDim2.new(0, 100, 0, 20)
-            gui.StudsOffset = Vector3.new(0, 3, 0)
-            gui.Parent = character
-
-            local label = Instance.new("TextLabel")
-            label.Text = player.Name
-            label.Font = Enum.Font.SourceSans
-            label.TextColor3 = Color3.new(1, 1, 1)
-            label.BackgroundTransparency = 1
-            label.TextScaled = true
-            label.Size = UDim2.new(1, 0, 1, 0)
-            label.Parent = gui
-
-            local stroke = Instance.new("UIStroke")
-            stroke.Thickness = 0.75
-            stroke.Color = Color3.new(0, 0, 0)
-            stroke.Parent = label
-        end
-    end
-    player.CharacterAdded:Connect(function(char)
-        char:WaitForChild("Head", 5)
-        task.wait(0.2)
-        Apply(char)
-    end)
-    if player.Character then Apply(player.Character) end
-end
-
-local function ToggleUsernameESP(state)
-    UsernameESP_Enabled = state
-    for _, p in ipairs(Players:GetPlayers()) do
-        if state then AddUsernameESP(p) else RemoveUsernameESP(p) end
-    end
-end
-
-Players.PlayerAdded:Connect(function(p)
-    if UsernameESP_Enabled then AddUsernameESP(p) end
-end)
-
-tabVisual:CreateToggle({
-    Name = "Username ESP",
-    CurrentValue = false,
-    Callback = ToggleUsernameESP,
-})
-
---// === Box ESP ===
-local BoxESP_Enabled = false
-local BoxDrawings = {}
-
-local function RemoveBoxESP(player)
-    if BoxDrawings[player] then
-        BoxDrawings[player]:Remove()
-        BoxDrawings[player] = nil
-    end
-end
-
-local function CreateBoxESP(player)
-    if player == LocalPlayer or BoxDrawings[player] then return end
-    local box = Drawing.new("Square")
-    box.Thickness = 1
-    box.Color = Color3.new(1, 1, 1)
-    box.Transparency = 1
-    box.Filled = false
-    box.Visible = false
-    BoxDrawings[player] = box
-end
-
-local function UpdateBoxESP()
-    for player, box in pairs(BoxDrawings) do
-        local char = player.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-
-        if not hrp or not hum or hum.Health <= 0 then
-            box.Visible = false
-            continue
-        end
-
-        local height, width = 5, 2.5
-        local topWorld = hrp.Position + Vector3.new(0, height / 2, 0)
-        local bottomWorld = hrp.Position - Vector3.new(0, height / 2, 0)
-        local leftOffset = Camera.CFrame.RightVector * -width / 2
-        local rightOffset = Camera.CFrame.RightVector * width / 2
-
-        local topLeft3D = topWorld + leftOffset
-        local bottomRight3D = bottomWorld + rightOffset
-
-        local topLeft2D, vis1 = Camera:WorldToViewportPoint(topLeft3D)
-        local bottomRight2D, vis2 = Camera:WorldToViewportPoint(bottomRight3D)
-
-        if vis1 and vis2 then
-            box.Position = Vector2.new(topLeft2D.X, topLeft2D.Y)
-            box.Size = Vector2.new(bottomRight2D.X - topLeft2D.X, bottomRight2D.Y - topLeft2D.Y)
-            box.Visible = BoxESP_Enabled
-        else
-            box.Visible = false
-        end
-    end
-end
-
-Players.PlayerAdded:Connect(CreateBoxESP)
-Players.PlayerRemoving:Connect(RemoveBoxESP)
-for _, p in ipairs(Players:GetPlayers()) do
-    if p ~= LocalPlayer then CreateBoxESP(p) end
-end
-
-RunService.RenderStepped:Connect(function()
-    if BoxESP_Enabled then UpdateBoxESP() end
-end)
-
-tabVisual:CreateToggle({
-    Name = "Box ESP",
-    CurrentValue = false,
-    Callback = function(state)
-        BoxESP_Enabled = state
-        if not state then
-            for _, box in pairs(BoxDrawings) do box.Visible = false end
-        end
-    end
-})
-
---// === Obby System ===
-local Obby_Enabled = false
-
--- Anti-AFK
-LocalPlayer.Idled:Connect(function()
-    VirtualUser:Button2Down(Vector2.new(), Workspace.CurrentCamera.CFrame)
-    task.wait(1)
-    VirtualUser:Button2Up(Vector2.new(), Workspace.CurrentCamera.CFrame)
-end)
-
--- Utilities
+-- === Obby System ===
 local function Notify(title, text, duration)
     StarterGui:SetCore("SendNotification", {
         Title = title,
@@ -383,7 +248,6 @@ local function tryRebirth(hrp)
     end
 end
 
--- Stage label UI
 local stageGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
 local label = Instance.new("TextLabel", stageGui)
 label.Size = UDim2.new(0, 300, 0, 30)
@@ -395,7 +259,6 @@ label.Font = Enum.Font.SourceSansBold
 label.TextSize = 20
 label.TextXAlignment = Enum.TextXAlignment.Left
 
--- Main loop
 function startObby()
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local hrp = char:WaitForChild("HumanoidRootPart")
@@ -424,15 +287,3 @@ function startObby()
         label.Text = ""
     end)
 end
-
--- UI toggle
-tabObby:CreateToggle({
-    Name = "Enable Obby Auto-Farm + Rebirth",
-    CurrentValue = false,
-    Callback = function(state)
-        Obby_Enabled = state
-        if state then
-            startObby()
-        end
-    end
-})
