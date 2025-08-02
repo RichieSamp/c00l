@@ -1,33 +1,28 @@
---// === Service Initialization ===
-local HttpService = game:GetService("HttpService")
+--=== Services ===--
 local Players = game:GetService("Players")
-local MarketplaceService = game:GetService("MarketplaceService")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 
-local Request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request)
+--=== Executor + Rayfield UI ===--
 local Executor = identifyexecutor and identifyexecutor() or "Unknown"
-
---// === UI Initialization ===
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 local MainUI = Rayfield:CreateWindow({
-    Name = "Learzy Hub | " .. Executor,
-    Theme = "Amethyst",
-    ToggleUIKeybind = "K",
+	Name = "Learzy Hub | " .. Executor,
+	Theme = "Amethyst",
+	ToggleUIKeybind = "K",
 })
 
---// === UI Tabs ===
+--=== Tabs ===--
 local tabPlayer = MainUI:CreateTab("Player", 4483362458)
 local tabVisual = MainUI:CreateTab("Visual", 4483362458)
-local tabCombat = MainUI:CreateTab("Combat", 4483362458)
-local tabVehicle = MainUI:CreateTab("Vehicle", 4483362458)
+local tabESP = tabVisual("ESP", 4483362458)
 
-tabPlayer:CreateParagraph({Title = "Player", Content = "Movement tools available below"})
-tabVisual:CreateParagraph({Title = "Visual", Content = "ESP options below"})
-
---// === Fly ===
+--// ---------------------
+--//      Player Tab
+--// ---------------------
 local Fly_Enabled = false
 local Fly_Speed = 60
 local BodyGyro, BodyVelocity, FlyConnection
@@ -35,243 +30,316 @@ local character, humanoidRootPart
 local noclippedParts = {}
 
 local function EnableNoclip()
-    table.clear(noclippedParts)
-    for _, part in ipairs(character:GetDescendants()) do
-        if part:IsA("BasePart") and part.CanCollide then
-            noclippedParts[part] = true
-            part.CanCollide = false
-        end
-    end
+	table.clear(noclippedParts)
+	for _, part in ipairs(character:GetDescendants()) do
+		if part:IsA("BasePart") and part.CanCollide then
+			noclippedParts[part] = true
+			part.CanCollide = false
+		end
+	end
 end
 
 local function RestoreCollision()
-    for part in pairs(noclippedParts) do
-        if part and part:IsA("BasePart") then
-            part.CanCollide = true
-        end
-    end
-    table.clear(noclippedParts)
+	for part in pairs(noclippedParts) do
+		if part and part:IsA("BasePart") then
+			part.CanCollide = true
+		end
+	end
+	table.clear(noclippedParts)
 end
 
 local function GetInputDirection()
-    local direction = Vector3.zero
-    if UserInputService:IsKeyDown(Enum.KeyCode.W) then direction += Vector3.new(0, 0, -1) end
-    if UserInputService:IsKeyDown(Enum.KeyCode.S) then direction += Vector3.new(0, 0, 1) end
-    if UserInputService:IsKeyDown(Enum.KeyCode.A) then direction += Vector3.new(-1, 0, 0) end
-    if UserInputService:IsKeyDown(Enum.KeyCode.D) then direction += Vector3.new(1, 0, 0) end
-    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction += Vector3.new(0, 1, 0) end
-    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then direction += Vector3.new(0, -1, 0) end
-    return direction
+	local direction = Vector3.zero
+	if UserInputService:IsKeyDown(Enum.KeyCode.W) then direction += Vector3.new(0, 0, -1) end
+	if UserInputService:IsKeyDown(Enum.KeyCode.S) then direction += Vector3.new(0, 0, 1) end
+	if UserInputService:IsKeyDown(Enum.KeyCode.A) then direction += Vector3.new(-1, 0, 0) end
+	if UserInputService:IsKeyDown(Enum.KeyCode.D) then direction += Vector3.new(1, 0, 0) end
+	if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction += Vector3.new(0, 1, 0) end
+	if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then direction += Vector3.new(0, -1, 0) end
+	return direction
 end
 
 local function StartFly()
-    character = LocalPlayer.Character
-    if not character then return end
-    humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then return end
+	character = LocalPlayer.Character
+	if not character then return end
+	humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+	if not humanoidRootPart then return end
 
-    EnableNoclip()
+	EnableNoclip()
 
-    BodyGyro = Instance.new("BodyGyro")
-    BodyGyro.P = 9e4
-    BodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-    BodyGyro.CFrame = humanoidRootPart.CFrame
-    BodyGyro.Parent = humanoidRootPart
+	BodyGyro = Instance.new("BodyGyro")
+	BodyGyro.P = 9e4
+	BodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+	BodyGyro.CFrame = humanoidRootPart.CFrame
+	BodyGyro.Parent = humanoidRootPart
 
-    BodyVelocity = Instance.new("BodyVelocity")
-    BodyVelocity.Velocity = Vector3.zero
-    BodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    BodyVelocity.Parent = humanoidRootPart
+	BodyVelocity = Instance.new("BodyVelocity")
+	BodyVelocity.Velocity = Vector3.zero
+	BodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+	BodyVelocity.Parent = humanoidRootPart
 
-    FlyConnection = RunService.RenderStepped:Connect(function()
-        if not Fly_Enabled then return end
-
-        local cameraCF = Camera.CFrame
-        local moveVec = GetInputDirection()
-
-        -- Fallback untuk mobile jika tidak ada input WASD
-        if moveVec.Magnitude == 0 then
-            local hum = character:FindFirstChildOfClass("Humanoid")
-            moveVec = hum and hum.MoveDirection or Vector3.zero
-        end
-
-        if moveVec.Magnitude > 0 then
-            local worldVec = cameraCF:VectorToWorldSpace(moveVec)
-            BodyVelocity.Velocity = worldVec.Unit * Fly_Speed
-        else
-            BodyVelocity.Velocity = Vector3.zero
-        end
-
-        BodyGyro.CFrame = cameraCF
-        EnableNoclip()
-    end)
+	FlyConnection = RunService.RenderStepped:Connect(function()
+		if not Fly_Enabled then return end
+		local cameraCF = Camera.CFrame
+		local moveVec = GetInputDirection()
+		if moveVec.Magnitude == 0 then
+			local hum = character:FindFirstChildOfClass("Humanoid")
+			moveVec = hum and hum.MoveDirection or Vector3.zero
+		end
+		BodyVelocity.Velocity = moveVec.Magnitude > 0 and cameraCF:VectorToWorldSpace(moveVec).Unit * Fly_Speed or Vector3.zero
+		BodyGyro.CFrame = cameraCF
+		EnableNoclip()
+	end)
 end
 
 local function StopFly()
-    Fly_Enabled = false
-    if FlyConnection then FlyConnection:Disconnect() end
-    if BodyGyro then BodyGyro:Destroy() end
-    if BodyVelocity then BodyVelocity:Destroy() end
-    RestoreCollision()
+	Fly_Enabled = false
+	if FlyConnection then FlyConnection:Disconnect() end
+	if BodyGyro then BodyGyro:Destroy() end
+	if BodyVelocity then BodyVelocity:Destroy() end
+	RestoreCollision()
 end
 
 tabPlayer:CreateToggle({
-    Name = "Fly",
-    CurrentValue = false,
-    Callback = function(state)
-        Fly_Enabled = state
-        if state then StartFly() else StopFly() end
-    end
+	Name = "Fly",
+	CurrentValue = false,
+	Callback = function(state)
+		Fly_Enabled = state
+		if state then StartFly() else StopFly() end
+	end
 })
 
 tabPlayer:CreateSlider({
-    Name = "Fly Speed",
-    Range = {16, 200},
-    Increment = 1,
-    Suffix = " studs/s",
-    CurrentValue = Fly_Speed,
-    Callback = function(value)
-        Fly_Speed = value
-    end
+	Name = "Fly Speed",
+	Range = {16, 200},
+	Increment = 1,
+	Suffix = " studs/s",
+	CurrentValue = Fly_Speed,
+	Callback = function(value)
+		Fly_Speed = value
+	end
 })
 
---// === Username ESP (Stroke Tipis) ===
+--// ---------------------
+--//     ESP Tab (Upgraded)
+--// ---------------------
+local ESP_Drawings = {}
+local ESPColor = Color3.fromRGB(255, 255, 255)
 local UsernameESP_Enabled = false
-local function RemoveUsernameESP(player)
-    if player.Character and player.Character:FindFirstChild("UsernameESP") then
-        player.Character:FindFirstChild("UsernameESP"):Destroy()
-    end
-end
+local BoxESP_Enabled = false
+local ChamsESP_Enabled = false
+local HealthESP_Enabled = false
+local DistanceESP_Enabled = false
 
-local function AddUsernameESP(player)
-    if player == LocalPlayer then return end
-    local function Apply(character)
-        if not UsernameESP_Enabled then return end
-        local head = character:FindFirstChild("Head")
-        if head and not character:FindFirstChild("UsernameESP") then
-            local gui = Instance.new("BillboardGui")
-            gui.Name = "UsernameESP"
-            gui.Adornee = head
-            gui.AlwaysOnTop = true
-            gui.Size = UDim2.new(0, 100, 0, 20)
-            gui.StudsOffset = Vector3.new(0, 3, 0)
-            gui.Parent = character
-
-            local label = Instance.new("TextLabel")
-            label.Text = player.Name
-            label.Font = Enum.Font.SourceSans
-            label.TextColor3 = Color3.new(1, 1, 1)
-            label.BackgroundTransparency = 1
-            label.TextScaled = true
-            label.Size = UDim2.new(1, 0, 1, 0)
-            label.Parent = gui
-
-            local stroke = Instance.new("UIStroke")
-            stroke.Thickness = 0.75
-            stroke.Color = Color3.new(0, 0, 0)
-            stroke.Parent = label
-        end
-    end
-    player.CharacterAdded:Connect(function(char)
-        char:WaitForChild("Head", 5)
-        task.wait(0.2)
-        Apply(char)
-    end)
-    if player.Character then Apply(player.Character) end
-end
-
-local function ToggleUsernameESP(state)
-    UsernameESP_Enabled = state
-    for _, p in ipairs(Players:GetPlayers()) do
-        if state then AddUsernameESP(p) else RemoveUsernameESP(p) end
-    end
-end
-
-Players.PlayerAdded:Connect(function(p)
-    if UsernameESP_Enabled then AddUsernameESP(p) end
-end)
-
-tabVisual:CreateToggle({
-    Name = "Username ESP",
-    CurrentValue = false,
-    Callback = ToggleUsernameESP,
+tabESP:CreateColorPicker({
+	Name = "ESP Color",
+	Color = ESPColor,
+	Callback = function(color)
+		ESPColor = color
+	end
 })
 
---// === 2D Box ESP ===
-local BoxESP_Enabled = false
-local BoxDrawings = {}
+tabESP:CreateToggle({
+	Name = "Username ESP",
+	CurrentValue = false,
+	Callback = function(state) UsernameESP_Enabled = state end
+})
 
-local function RemoveBoxESP(player)
-    if BoxDrawings[player] then
-        BoxDrawings[player]:Remove()
-        BoxDrawings[player] = nil
+tabESP:CreateToggle({
+	Name = "Box ESP",
+	CurrentValue = false,
+	Callback = function(state) BoxESP_Enabled = state end
+})
+
+tabESP:CreateToggle({
+	Name = "Chams (Highlight)",
+	CurrentValue = false,
+	Callback = function(state) ChamsESP_Enabled = state end
+})
+
+tabESP:CreateToggle({
+	Name = "Health Bar ESP",
+	CurrentValue = false,
+	Callback = function(state) HealthESP_Enabled = state end
+})
+
+tabESP:CreateToggle({
+	Name = "Distance ESP",
+	CurrentValue = false,
+	Callback = function(state) DistanceESP_Enabled = state end
+})
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local Camera = Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local ESP_Drawings = {}
+local function clearESP(player)
+    if ESP_Drawings[player] then
+        for _, v in pairs(ESP_Drawings[player]) do
+            if typeof(v) == "Instance" then v:Destroy()
+            elseif typeof(v) == "table" and v.Remove then v:Remove()
+            elseif typeof(v) == "function" then v() end
+        end
+        ESP_Drawings[player] = nil
     end
 end
 
-local function CreateBoxESP(player)
-    if player == LocalPlayer or BoxDrawings[player] then return end
-    local box = Drawing.new("Square")
-    box.Thickness = 1
-    box.Color = Color3.new(1, 1, 1)
-    box.Transparency = 1
-    box.Filled = false
-    box.Visible = false
-    BoxDrawings[player] = box
+local function applyESP(player)
+    if player == LocalPlayer then return end
+    if ESP_Drawings[player] then clearESP(player) end
+    ESP_Drawings[player] = {}
+
+    -- Username
+    if UsernameESP_Enabled then
+        local function attachName(char)
+            local head = char:FindFirstChild("Head")
+            if head and not char:FindFirstChild("UsernameESP") then
+                local gui = Instance.new("BillboardGui")
+                gui.Name = "UsernameESP"
+                gui.Adornee = head
+                gui.AlwaysOnTop = true
+                gui.Size = UDim2.new(0, 100, 0, 20)
+                gui.StudsOffset = Vector3.new(0, 3, 0)
+                gui.Parent = char
+
+                local label = Instance.new("TextLabel")
+                label.Text = player.Name
+                label.Font = Enum.Font.SourceSansBold
+                label.TextColor3 = ESPColor
+                label.BackgroundTransparency = 1
+                label.TextScaled = true
+                label.Size = UDim2.new(1, 0, 1, 0)
+                label.Parent = gui
+
+                local stroke = Instance.new("UIStroke")
+                stroke.Thickness = 0.75
+                stroke.Color = Color3.new(0, 0, 0)
+                stroke.Parent = label
+
+                ESP_Drawings[player].Name = gui
+            end
+        end
+        if player.Character then attachName(player.Character) end
+        player.CharacterAdded:Connect(function(char)
+            task.wait(0.5)
+            attachName(char)
+        end)
+    end
+
+    -- Box ESP
+    if BoxESP_Enabled then
+        local box = Drawing.new("Square")
+        box.Thickness = 1
+        box.Color = ESPColor
+        box.Transparency = 1
+        box.Filled = false
+        box.Visible = false
+        ESP_Drawings[player].Box = box
+    end
+
+    -- Chams
+    if ChamsESP_Enabled then
+        local function attachHighlight(char)
+            local hl = Instance.new("Highlight")
+            hl.FillColor = ESPColor
+            hl.OutlineColor = Color3.new(0, 0, 0)
+            hl.FillTransparency = 0.5
+            hl.OutlineTransparency = 0.3
+            hl.Adornee = char
+            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            hl.Parent = char
+            ESP_Drawings[player].Highlight = hl
+        end
+        if player.Character then attachHighlight(player.Character) end
+        player.CharacterAdded:Connect(function(char)
+            task.wait(0.3)
+            attachHighlight(char)
+        end)
+    end
 end
 
-local function UpdateBoxESP()
-    for player, box in pairs(BoxDrawings) do
+for _, p in ipairs(Players:GetPlayers()) do applyESP(p) end
+Players.PlayerAdded:Connect(function(p) p.CharacterAdded:Wait() applyESP(p) end)
+Players.PlayerRemoving:Connect(function(p) clearESP(p) end)
+
+RunService.RenderStepped:Connect(function()
+    for player, tbl in pairs(ESP_Drawings) do
         local char = player.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         local hum = char and char:FindFirstChildOfClass("Humanoid")
-
         if not hrp or not hum or hum.Health <= 0 then
-            box.Visible = false
+            if tbl.Box then tbl.Box.Visible = false end
+            if tbl.Distance then tbl.Distance.Visible = false end
+            if tbl.HealthBar then tbl.HealthBar.Visible = false end
             continue
         end
 
-        -- Estimasi tinggi dan lebar dari karakter
-        local height = 5
-        local width = 2.5
+        local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
 
-        local topWorld = hrp.Position + Vector3.new(0, height / 2, 0)
-        local bottomWorld = hrp.Position - Vector3.new(0, height / 2, 0)
-        local leftOffset = workspace.CurrentCamera.CFrame.RightVector * -width / 2
-        local rightOffset = workspace.CurrentCamera.CFrame.RightVector * width / 2
+        if tbl.Box then
+            local height, width = 5, 2.5
+            local top = hrp.Position + Vector3.new(0, height/2, 0)
+            local bottom = hrp.Position - Vector3.new(0, height/2, 0)
+            local left = Camera.CFrame.RightVector * -width / 2
+            local right = Camera.CFrame.RightVector * width / 2
 
-        local topLeft3D = topWorld + leftOffset
-        local bottomRight3D = bottomWorld + rightOffset
+            local topLeft3D = top + left
+            local bottomRight3D = bottom + right
 
-        local topLeft2D, vis1 = Camera:WorldToViewportPoint(topLeft3D)
-        local bottomRight2D, vis2 = Camera:WorldToViewportPoint(bottomRight3D)
+            local tl2D, vis1 = Camera:WorldToViewportPoint(topLeft3D)
+            local br2D, vis2 = Camera:WorldToViewportPoint(bottomRight3D)
 
-        if vis1 and vis2 then
-            box.Position = Vector2.new(topLeft2D.X, topLeft2D.Y)
-            box.Size = Vector2.new(bottomRight2D.X - topLeft2D.X, bottomRight2D.Y - topLeft2D.Y)
-            box.Visible = BoxESP_Enabled
-        else
-            box.Visible = false
+            if vis1 and vis2 then
+                tbl.Box.Position = Vector2.new(tl2D.X, tl2D.Y)
+                tbl.Box.Size = Vector2.new(br2D.X - tl2D.X, br2D.Y - tl2D.Y)
+                tbl.Box.Visible = true
+                tbl.Box.Color = ESPColor
+            else
+                tbl.Box.Visible = false
+            end
+        end
+
+        if DistanceESP_Enabled then
+            if not tbl.Distance then
+                local txt = Drawing.new("Text")
+                txt.Size = 14
+                txt.Center = true
+                txt.Outline = true
+                txt.Font = 2
+                txt.Visible = false
+                ESP_Drawings[player].Distance = txt
+            end
+            local dist = math.floor((LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and (LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude) or 0)
+            tbl.Distance.Text = tostring(dist) .. "m"
+            tbl.Distance.Position = Vector2.new(screenPos.X, screenPos.Y - 30)
+            tbl.Distance.Color = ESPColor
+            tbl.Distance.Visible = onScreen
+        elseif tbl.Distance then
+            tbl.Distance.Visible = false
+        end
+
+        if HealthESP_Enabled then
+            if not tbl.HealthBar then
+                local bar = Drawing.new("Square")
+                bar.Thickness = 1
+                bar.Filled = true
+                bar.Visible = false
+                ESP_Drawings[player].HealthBar = bar
+            end
+            local barHeight = 100
+            local healthPerc = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+            local barSize = barHeight * healthPerc
+
+            tbl.HealthBar.Size = Vector2.new(4, barSize)
+            tbl.HealthBar.Position = Vector2.new(screenPos.X - 45, screenPos.Y + 50 - barSize)
+            tbl.HealthBar.Color = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(0, 255, 0), healthPerc)
+            tbl.HealthBar.Visible = onScreen
+        elseif tbl.HealthBar then
+            tbl.HealthBar.Visible = false
         end
     end
-end
-
-Players.PlayerAdded:Connect(CreateBoxESP)
-Players.PlayerRemoving:Connect(RemoveBoxESP)
-for _, p in ipairs(Players:GetPlayers()) do
-    if p ~= LocalPlayer then CreateBoxESP(p) end
-end
-
-RunService.RenderStepped:Connect(function()
-    if BoxESP_Enabled then UpdateBoxESP() end
 end)
-
-tabVisual:CreateToggle({
-    Name = "Box ESP",
-    CurrentValue = false,
-    Callback = function(state)
-        BoxESP_Enabled = state
-        if not state then
-            for _, box in pairs(BoxDrawings) do box.Visible = false end
-        end
-    end
-})
