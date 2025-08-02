@@ -6,7 +6,7 @@ local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
 -- Load UI Library dari GitHub
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/kamu/repo/main/lib.lua"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/RichieSamp/c00l/refs/heads/main/lib.lua"))()
 local Window = Library:CreateWindow("Learzy Hub", Vector2.new(500, 550), Enum.KeyCode.K)
 local Tab1 = Window:CreateTab("Player")
 local Tab2 = Window:CreateTab("Visual")
@@ -251,4 +251,5 @@ Tab2:CreateToggle("Health ESP", function(state) ESP.HealthESP = state end)
 Tab2:CreateToggle("Distance ESP", function(state) ESP.DistanceESP = state end)
 
 ESP:Init()
+
 
