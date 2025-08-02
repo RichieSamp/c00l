@@ -18,7 +18,7 @@ local MainUI = Rayfield:CreateWindow({
 --=== Tabs ===--
 local tabPlayer = MainUI:CreateTab("Player", 4483362458)
 local tabVisual = MainUI:CreateTab("Visual", 4483362458)
-local tabESP = tabVisual("ESP", 4483362458)
+local tabESP = MainUI:CreateTab("ESP", 4483362458)
 
 --// ---------------------
 --//      Player Tab
