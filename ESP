@@ -1,0 +1,227 @@
+--=== ESP Core Settings ===--
+local ESP_Drawings = {}
+local ESPColor = Color3.fromRGB(255, 255, 255)
+local UsernameESP_Enabled = false
+local BoxESP_Enabled = false
+local ChamsESP_Enabled = false
+local HealthESP_Enabled = false
+local DistanceESP_Enabled = false
+
+--=== ESP Toggles (inside Visual tab) ===--
+tabVisual:CreateColorPicker({
+	Name = "ESP Color",
+	Color = ESPColor,
+	Callback = function(color)
+		ESPColor = color
+	end
+})
+
+tabVisual:CreateToggle({
+	Name = "Username ESP",
+	CurrentValue = false,
+	Callback = function(state)
+		UsernameESP_Enabled = state
+	end
+})
+
+tabVisual:CreateToggle({
+	Name = "Box ESP",
+	CurrentValue = false,
+	Callback = function(state)
+		BoxESP_Enabled = state
+	end
+})
+
+tabVisual:CreateToggle({
+	Name = "Chams (Highlight)",
+	CurrentValue = false,
+	Callback = function(state)
+		ChamsESP_Enabled = state
+	end
+})
+
+tabVisual:CreateToggle({
+	Name = "Health Bar ESP",
+	CurrentValue = false,
+	Callback = function(state)
+		HealthESP_Enabled = state
+	end
+})
+
+tabVisual:CreateToggle({
+	Name = "Distance ESP",
+	CurrentValue = false,
+	Callback = function(state)
+		DistanceESP_Enabled = state
+	end
+})
+
+--=== Clear ESP When Needed ===--
+local function clearESP(player)
+	if ESP_Drawings[player] then
+		for _, v in pairs(ESP_Drawings[player]) do
+			if typeof(v) == "Instance" then v:Destroy()
+			elseif typeof(v) == "table" and v.Remove then v:Remove()
+			elseif typeof(v) == "function" then v() end
+		end
+		ESP_Drawings[player] = nil
+	end
+end
+
+--=== Apply ESP to New Players ===--
+local function applyESP(player)
+	if player == LocalPlayer then return end
+	if ESP_Drawings[player] then clearESP(player) end
+	ESP_Drawings[player] = {}
+
+	player.CharacterAdded:Connect(function(char)
+		task.wait(0.5)
+
+		-- Username
+		if UsernameESP_Enabled then
+			local head = char:FindFirstChild("Head")
+			if head then
+				local gui = Instance.new("BillboardGui", char)
+				gui.Name = "UsernameESP"
+				gui.Adornee = head
+				gui.AlwaysOnTop = true
+				gui.Size = UDim2.new(0, 100, 0, 20)
+				gui.StudsOffset = Vector3.new(0, 3, 0)
+
+				local label = Instance.new("TextLabel", gui)
+				label.Text = player.Name
+				label.Font = Enum.Font.SourceSansBold
+				label.TextColor3 = ESPColor
+				label.BackgroundTransparency = 1
+				label.TextScaled = true
+				label.Size = UDim2.new(1, 0, 1, 0)
+
+				local stroke = Instance.new("UIStroke", label)
+				stroke.Thickness = 0.75
+				stroke.Color = Color3.new(0, 0, 0)
+
+				ESP_Drawings[player].Name = gui
+			end
+		end
+
+		-- Chams
+		if ChamsESP_Enabled then
+			local highlight = Instance.new("Highlight")
+			highlight.FillColor = ESPColor
+			highlight.OutlineColor = Color3.new(0, 0, 0)
+			highlight.FillTransparency = 0.5
+			highlight.OutlineTransparency = 0.3
+			highlight.Adornee = char
+			highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+			highlight.Parent = char
+
+			ESP_Drawings[player].Highlight = highlight
+		end
+	end)
+end
+
+--=== Loop Over All Players ===--
+for _, p in ipairs(Players:GetPlayers()) do applyESP(p) end
+Players.PlayerAdded:Connect(function(p) applyESP(p) end)
+Players.PlayerRemoving:Connect(function(p) clearESP(p) end)
+
+--=== ESP Render Logic ===--
+RunService.RenderStepped:Connect(function()
+	for player, tbl in pairs(ESP_Drawings) do
+		local char = player.Character
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if not hrp or not hum or hum.Health <= 0 then
+			if tbl.Box then tbl.Box.Visible = false end
+			if tbl.Distance then tbl.Distance.Visible = false end
+			if tbl.HealthBar then tbl.HealthBar.Visible = false end
+			continue
+		end
+
+		local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+		-- Box ESP
+		if BoxESP_Enabled then
+			if not tbl.Box then
+				local box = Drawing.new("Square")
+				box.Thickness = 1
+				box.Filled = false
+				box.Transparency = 1
+				box.Visible = false
+				box.Color = ESPColor
+				tbl.Box = box
+			end
+
+			local height = 5
+			local width = 2.5
+			local top = hrp.Position + Vector3.new(0, height / 2, 0)
+			local bottom = hrp.Position - Vector3.new(0, height / 2, 0)
+			local left = Camera.CFrame.RightVector * -width / 2
+			local right = Camera.CFrame.RightVector * width / 2
+
+			local tl = Camera:WorldToViewportPoint(top + left)
+			local br = Camera:WorldToViewportPoint(bottom + right)
+
+			tbl.Box.Position = Vector2.new(tl.X, tl.Y)
+			tbl.Box.Size = Vector2.new(br.X - tl.X, br.Y - tl.Y)
+			tbl.Box.Color = ESPColor
+			tbl.Box.Visible = onScreen
+		elseif tbl.Box then
+			tbl.Box.Visible = false
+		end
+
+		-- Distance ESP
+		if DistanceESP_Enabled then
+			if not tbl.Distance then
+				local txt = Drawing.new("Text")
+				txt.Size = 14
+				txt.Center = true
+				txt.Outline = true
+				txt.Font = 2
+				txt.Visible = false
+				tbl.Distance = txt
+			end
+
+			local dist = math.floor((LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and (LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude) or 0)
+			tbl.Distance.Text = tostring(dist) .. "m"
+			tbl.Distance.Position = Vector2.new(screenPos.X, screenPos.Y - 30)
+			tbl.Distance.Color = ESPColor
+			tbl.Distance.Visible = onScreen
+		elseif tbl.Distance then
+			tbl.Distance.Visible = false
+		end
+
+		-- Health Bar
+		if HealthESP_Enabled then
+			if not tbl.HealthBar then
+				local bar = Drawing.new("Square")
+				bar.Filled = true
+				bar.Visible = false
+				tbl.HealthBar = bar
+
+				local outline = Drawing.new("Square")
+				outline.Filled = false
+				outline.Thickness = 1
+				outline.Color = Color3.new(0, 0, 0)
+				outline.Visible = false
+				tbl.HealthOutline = outline
+			end
+
+			local healthPerc = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+			local barHeight = 100
+			local barSize = barHeight * healthPerc
+
+			tbl.HealthBar.Size = Vector2.new(4, barSize)
+			tbl.HealthBar.Position = Vector2.new(screenPos.X - 45, screenPos.Y + 50 - barSize)
+			tbl.HealthBar.Color = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(0, 255, 0), healthPerc)
+			tbl.HealthBar.Visible = onScreen
+
+			tbl.HealthOutline.Size = Vector2.new(4, barHeight)
+			tbl.HealthOutline.Position = Vector2.new(screenPos.X - 45, screenPos.Y - barHeight / 2)
+			tbl.HealthOutline.Visible = onScreen
+		else
+			if tbl.HealthBar then tbl.HealthBar.Visible = false end
+			if tbl.HealthOutline then tbl.HealthOutline.Visible = false end
+		end
+	end
+end)
