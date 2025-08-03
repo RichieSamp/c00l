@@ -1,5 +1,3 @@
--- ESP.lua (Final & Fixed)
-
 local ESP = {}
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -27,9 +25,13 @@ end
 function ESP:clear(player)
     if ESP_Drawings[player] then
         for _, v in pairs(ESP_Drawings[player]) do
-            if typeof(v) == "Instance" then v:Destroy()
-            elseif typeof(v) == "table" and v.Remove then v:Remove()
-            elseif typeof(v) == "function" then v() end
+            if typeof(v) == "Instance" then
+                v:Destroy()
+            elseif typeof(v) == "table" and v.Remove then
+                v:Remove()
+            elseif typeof(v) == "function" then
+                v()
+            end
         end
         ESP_Drawings[player] = nil
     end
@@ -40,7 +42,7 @@ function ESP:apply(player)
     self:clear(player)
     ESP_Drawings[player] = {}
 
-    player.CharacterAdded:Connect(function(char)
+    local function setupESP(char)
         task.wait(0.4)
         if Settings.Username then
             local head = char:FindFirstChild("Head")
@@ -78,7 +80,13 @@ function ESP:apply(player)
             hl.Adornee = char
             ESP_Drawings[player].Highlight = hl
         end
-    end)
+    end
+
+    player.CharacterAdded:Connect(setupESP)
+
+    if player.Character then
+        setupESP(player.Character)
+    end
 end
 
 function ESP:Refresh()
@@ -108,7 +116,6 @@ function ESP:Init()
 
             local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
 
-            -- Box
             if Settings.Box then
                 if not tbl.Box then
                     local box = Drawing.new("Square")
@@ -133,7 +140,6 @@ function ESP:Init()
                 tbl.Box.Color = Settings.Color
             elseif tbl.Box then tbl.Box.Visible = false end
 
-            -- Distance
             if Settings.Distance then
                 if not tbl.Distance then
                     local txt = Drawing.new("Text")
@@ -150,7 +156,6 @@ function ESP:Init()
                 tbl.Distance.Visible = onScreen
             elseif tbl.Distance then tbl.Distance.Visible = false end
 
-            -- Health Bar
             if Settings.Health then
                 if not tbl.Health then
                     local bar = Drawing.new("Square")
