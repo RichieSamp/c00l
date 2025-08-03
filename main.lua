@@ -9,7 +9,7 @@ local LocalPlayer = Players.LocalPlayer
 --=== Rayfield UI ===--
 local Executor = identifyexecutor and identifyexecutor() or "Unknown"
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
-task.wait(0.5) -- pastikan Rayfield siap
+task.wait(0.5) -- Jeda supaya Rayfield benar-benar siap
 
 local MainUI = Rayfield:CreateWindow({
 	Name = "Learzy Hub | " .. Executor,
@@ -18,8 +18,8 @@ local MainUI = Rayfield:CreateWindow({
 })
 
 --=== Tabs ===--
-local tabPlayer = MainUI:CreateTab("Player") -- Removed icon to prevent tab bug
-local tabVisual = MainUI:CreateTab("Visual")
+local tabPlayer = MainUI:CreateTab("Player") -- Tanpa icon untuk stabilitas
+local tabVisual
 
 --=== Fly Feature ===--
 local Fly_Enabled = false
@@ -120,59 +120,63 @@ tabPlayer:CreateSlider({
 })
 
 --=== ESP Integration ===--
-local ESP = loadstring(game:HttpGet("https://raw.githubusercontent.com/RichieSamp/c00l/main/ESP.lua"))()
-ESP:Init()
+task.spawn(function()
+	tabVisual = MainUI:CreateTab("Visual") -- Dijalankan setelah Rayfield siap
 
-tabVisual:CreateColorPicker({
-	Name = "ESP Color",
-	Color = Color3.fromRGB(255, 255, 255),
-	Callback = function(color)
-		ESP:UpdateConfig({ Color = color })
-		ESP:Refresh()
-	end
-})
+	local ESP = loadstring(game:HttpGet("https://raw.githubusercontent.com/RichieSamp/c00l/main/ESP.lua"))()
+	ESP:Init()
 
-tabVisual:CreateToggle({
-	Name = "Username ESP",
-	CurrentValue = false,
-	Callback = function(state)
-		ESP:UpdateConfig({ Username = state })
-		ESP:Refresh()
-	end
-})
+	tabVisual:CreateColorPicker({
+		Name = "ESP Color",
+		Color = Color3.fromRGB(255, 255, 255),
+		Callback = function(color)
+			ESP:UpdateConfig({ Color = color })
+			ESP:Refresh()
+		end
+	})
 
-tabVisual:CreateToggle({
-	Name = "Box ESP",
-	CurrentValue = false,
-	Callback = function(state)
-		ESP:UpdateConfig({ Box = state })
-		ESP:Refresh()
-	end
-})
+	tabVisual:CreateToggle({
+		Name = "Username ESP",
+		CurrentValue = false,
+		Callback = function(state)
+			ESP:UpdateConfig({ Username = state })
+			ESP:Refresh()
+		end
+	})
 
-tabVisual:CreateToggle({
-	Name = "Chams",
-	CurrentValue = false,
-	Callback = function(state)
-		ESP:UpdateConfig({ Chams = state })
-		ESP:Refresh()
-	end
-})
+	tabVisual:CreateToggle({
+		Name = "Box ESP",
+		CurrentValue = false,
+		Callback = function(state)
+			ESP:UpdateConfig({ Box = state })
+			ESP:Refresh()
+		end
+	})
 
-tabVisual:CreateToggle({
-	Name = "Distance ESP",
-	CurrentValue = false,
-	Callback = function(state)
-		ESP:UpdateConfig({ Distance = state })
-		ESP:Refresh()
-	end
-})
+	tabVisual:CreateToggle({
+		Name = "Chams",
+		CurrentValue = false,
+		Callback = function(state)
+			ESP:UpdateConfig({ Chams = state })
+			ESP:Refresh()
+		end
+	})
 
-tabVisual:CreateToggle({
-	Name = "Health Bar",
-	CurrentValue = false,
-	Callback = function(state)
-		ESP:UpdateConfig({ Health = state })
-		ESP:Refresh()
-	end
-})
+	tabVisual:CreateToggle({
+		Name = "Distance ESP",
+		CurrentValue = false,
+		Callback = function(state)
+			ESP:UpdateConfig({ Distance = state })
+			ESP:Refresh()
+		end
+	})
+
+	tabVisual:CreateToggle({
+		Name = "Health Bar",
+		CurrentValue = false,
+		Callback = function(state)
+			ESP:UpdateConfig({ Health = state })
+			ESP:Refresh()
+		end
+	})
+end)
