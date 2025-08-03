@@ -9,6 +9,8 @@ local LocalPlayer = Players.LocalPlayer
 --=== Rayfield UI ===--
 local Executor = identifyexecutor and identifyexecutor() or "Unknown"
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+task.wait(0.5) -- pastikan Rayfield siap
+
 local MainUI = Rayfield:CreateWindow({
 	Name = "Learzy Hub | " .. Executor,
 	Theme = "Amethyst",
@@ -16,8 +18,8 @@ local MainUI = Rayfield:CreateWindow({
 })
 
 --=== Tabs ===--
-local tabPlayer = MainUI:CreateTab("Player", 4483362458)
-local tabVisual = MainUI:CreateTab("Visual", 4483362458)
+local tabPlayer = MainUI:CreateTab("Player") -- Removed icon to prevent tab bug
+local tabVisual = MainUI:CreateTab("Visual")
 
 --=== Fly Feature ===--
 local Fly_Enabled = false
@@ -126,6 +128,7 @@ tabVisual:CreateColorPicker({
 	Color = Color3.fromRGB(255, 255, 255),
 	Callback = function(color)
 		ESP:UpdateConfig({ Color = color })
+		ESP:Refresh()
 	end
 })
 
